@@ -191,6 +191,31 @@ Le mode interactif n'a ni macro, ni fermeture automatique après délai.
 Une fermeture réussie de la fenêtre ne prouve pas à elle seule qu'une sauvegarde
 a été effectuée ; ce point devra être vérifié au rechargement.
 
+### Entrée bloquée ou dérive de manette
+
+Si le personnage se déplace seul, fermer l'émulateur sans sauvegarder puis
+relancer **le même profil**, sans réimporter :
+
+```sh
+python3 tools/run_bizhawk_save_probe.py --interactive --keyboard-only \
+  --session /tmp/opencode/oras-save-IDENTIFIANT \
+  --rom "/chemin/vers/OR-verifie.3ds"
+```
+
+Cette option change uniquement les contrôles 3DS du profil de test :
+
+- Flèches : déplacement ; **X** : confirmer/A ; **Z** : retour/B.
+- **S** : bouton X/menu ; **A** : bouton Y ; Entrée/Space : Start/Select.
+- Bindings de manette, axes Circle Pad/C-Stick et autofire 3DS retirés.
+- Souris conservée pour le tactile.
+- `SDL_JOYSTICK_HIDAPI=0` limité à ce processus, pas au système.
+- Aucun script Lua de contrôle ni macro en mode interactif.
+
+Les contrôles des autres systèmes et du profil `bin/` restent inchangés.
+Le mode interactif ordinaire ne change pas ses pilotes d'entrée.
+Une reconnexion ou dérive de manette n'est pas diagnostiquée avec certitude
+par cette option : elle fournit un contournement clavier explicite.
+
 Pour reprendre ce même profil :
 
 ```sh

@@ -85,6 +85,25 @@ def seed_archive(source: Path, destination: Path) -> dict:
     }
 
 
+def keyboard_only_config(config: dict) -> dict:
+    """Opt-in 3DS keyboard bindings; never alter the source profile or other systems."""
+    config = json.loads(json.dumps(config))
+    config.setdefault("AllTrollers", {})["3DS Controller"] = {
+        "A": "X", "B": "Z", "X": "S", "Y": "A",
+        "Up": "Up", "Down": "Down", "Left": "Left", "Right": "Right",
+        "L": "Q", "R": "W", "ZL": "E", "ZR": "R",
+        "Select": "Space", "Start": "Enter", "Touch": "WMouse L",
+    }
+    config.setdefault("AllTrollersAutoFire", {})["3DS Controller"] = {}
+    analog = config.setdefault("AllTrollersAnalog", {}).setdefault("3DS Controller", {})
+    for axis in ("Circle Pad X", "Circle Pad Y", "C-Stick X", "C-Stick Y"):
+        analog[axis] = {
+            "Value": "", "Mult": 1.0, "Deadzone": 0.1,
+            "ButtonBindPositive": "", "ButtonBindNegative": "",
+        }
+    return config
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bizhawk", type=Path, default=PROJECT_ROOT / "bin/BizHawk-2.11.1-linux-x64")
@@ -97,6 +116,10 @@ def main() -> int:
     parser.add_argument(
         "--interactive", action="store_true",
         help="Open the private profile for manual play; no macro or automatic timeout",
+    )
+    parser.add_argument(
+        "--keyboard-only", action="store_true",
+        help="Interactive private 3DS keyboard controls; unbind gamepads and disable child HIDAPI",
     )
     parser.add_argument(
         "--read-inventory", action="store_true",
@@ -120,6 +143,8 @@ def main() -> int:
         parser.error("Timeout must be positive and finite")
     if args.session and args.seed_save:
         parser.error("--session and --seed-save are mutually exclusive")
+    if args.keyboard_only and not args.interactive:
+        parser.error("--keyboard-only requires --interactive")
     event_mode = args.scan_event_work or args.read_event_work
     if sum((args.read_inventory, args.scan_inventory, args.scan_event_work, args.read_event_work)) > 1:
         parser.error("Choose a single memory observation mode")
@@ -193,10 +218,13 @@ def main() -> int:
         if args.seed_save:
             manifest.update(seed_archive(args.seed_save, save_destination(runtime, identity["program_id"])))
         (session / "profile.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    if args.keyboard_only:
+        config_path = runtime / "config.ini"
+        config_path.write_text(json.dumps(keyboard_only_config(json.loads(config_path.read_text())), indent=2) + "\n")
     attempt = Path(tempfile.mkdtemp(prefix="attempt-", dir=session))
     plan = attempt / "steps.txt"
     plan.write_text("".join(f"{frames}:{names}\n" for frames, names in steps))
-    env = emulator_environment(runtime, automated=not args.interactive)
+    env = emulator_environment(runtime, automated=not args.interactive or args.keyboard_only)
     env.update({
         "ORAS_UI_PLAN": str(plan), "ORAS_UI_CAPTURE": str(attempt),
         "ORAS_UI_SPEED": str(args.speed),
@@ -274,8 +302,10 @@ def main() -> int:
         "memory_read_requests": 0,
         "memory_write_requests": 0,
         "interactive": args.interactive,
+        "keyboard_only": args.keyboard_only,
         "speed_percent": args.speed,
         "host_hidapi_disabled_for_automation": not args.interactive,
+        "host_hidapi_disabled_for_keyboard_only": args.keyboard_only,
     }
     print(f"Private save session: {session}\nAttempt: {attempt}", flush=True)
     with (attempt / "stdout.txt").open("w") as stdout, (attempt / "stderr.txt").open("w") as stderr:

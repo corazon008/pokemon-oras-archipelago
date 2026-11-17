@@ -10,7 +10,7 @@ import unittest
 
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
-from run_bizhawk_save_probe import parse_steps, save_destination, seed_save, validate_save_container
+from run_bizhawk_save_probe import keyboard_only_config, parse_steps, save_destination, seed_save, validate_save_container
 from save_fixtures import synthetic_save
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +18,39 @@ LUA = shutil.which("lua5.4") or shutil.which("lua")
 
 
 class SaveProbeTests(unittest.TestCase):
+    def test_keyboard_only_unbinds_gamepads_in_private_3ds_config(self):
+        original = {
+            "AllTrollers": {
+                "3DS Controller": {"Up": "Up, X1 DpadUp", "A": "Keypad8"},
+                "NDS Controller": {"A": "J1 B1"},
+            },
+            "AllTrollersAnalog": {
+                "3DS Controller": {
+                    "Circle Pad X": {"Value": "X1 LeftThumbX Axis"},
+                    "Touch X": {"Value": "WMouse X"},
+                },
+            },
+            "AllTrollersAutoFire": {"3DS Controller": {"Left": "X1 A"}},
+        }
+        result = keyboard_only_config(original)
+        self.assertEqual(original["AllTrollers"]["3DS Controller"]["A"], "Keypad8")
+        self.assertEqual(original["AllTrollersAnalog"]["3DS Controller"]["Circle Pad X"]["Value"],
+                         "X1 LeftThumbX Axis")
+        self.assertEqual(result["AllTrollers"]["NDS Controller"], {"A": "J1 B1"})
+        self.assertEqual(result["AllTrollers"]["3DS Controller"]["Up"], "Up")
+        self.assertEqual(result["AllTrollers"]["3DS Controller"]["A"], "X")
+        self.assertEqual(result["AllTrollers"]["3DS Controller"]["B"], "Z")
+        self.assertEqual(result["AllTrollersAutoFire"]["3DS Controller"], {})
+        for name in ("Circle Pad X", "Circle Pad Y", "C-Stick X", "C-Stick Y"):
+            axis = result["AllTrollersAnalog"]["3DS Controller"][name]
+            self.assertEqual((axis["Value"], axis["ButtonBindPositive"], axis["ButtonBindNegative"]), ("", "", ""))
+        self.assertEqual(result["AllTrollersAnalog"]["3DS Controller"]["Touch X"], {"Value": "WMouse X"})
+
+    def test_keyboard_only_supports_missing_config_sections(self):
+        result = keyboard_only_config({})
+        self.assertEqual(result["AllTrollers"]["3DS Controller"]["X"], "S")
+        self.assertEqual(result["AllTrollersAnalog"]["3DS Controller"]["Circle Pad X"]["Value"], "")
+
     def test_input_plan(self):
         self.assertEqual(parse_steps("180:-,2:A,60:A+Start"),
                          [(180, "-"), (2, "A"), (60, "A+Start")])

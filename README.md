@@ -44,6 +44,7 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Variation native et persistance — rapport 007](docs/reports/007-native-quantity-and-persistence.md).
 - [Inventaire via AP et première écriture — rapport 008](docs/reports/008-connector-inventory-and-write.md).
 - [Candidat d'événement natif — rapport 009](docs/reports/009-native-clock-event-candidate.md).
+- [Contournement clavier d'une entrée bloquée — rapport 010](docs/reports/010-keyboard-input-workaround.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

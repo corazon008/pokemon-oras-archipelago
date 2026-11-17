@@ -97,7 +97,8 @@ def emulator_environment(runtime: Path, *, automated: bool = False) -> dict[str,
     })
     if automated:
         # Avoid the observed SDL HID gamepad shutdown race in automated tests.
-        # Interactive sessions retain the user's input drivers.
+        # Default interactive sessions retain the user's input drivers.
+        # The explicit keyboard-only launcher also opts into this hint.
         env["SDL_JOYSTICK_HIDAPI"] = "0"
     return env
 
