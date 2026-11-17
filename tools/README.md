@@ -77,7 +77,8 @@ Ce diagnostic :
 - Télécharge les dépendances AP depuis un commit figé, dont LuaSocket Linux.
 - Vérifie chaque SHA-256 du fichier `ap_connector.lock.json` avant chargement.
 - Utilise le connecteur et l'API Python amont sans les modifier.
-- Envoie seulement `VERSION`, `PING`, `SYSTEM` et deux requêtes `MEMORY_SIZE`.
+- Sans option mémoire, envoie seulement `VERSION`, `PING`, `SYSTEM` et deux
+  requêtes `MEMORY_SIZE`.
 - Vérifie une déconnexion/reconnexion et ferme sa propre instance via un signal
   fichier traité par le wrapper Lua.
 - Produit `result.json`, `stdout.txt` et `stderr.txt` sous
@@ -93,7 +94,7 @@ plage de ports est occupée. Ne pas lancer plusieurs diagnostics simultanément.
 Les deux modules Python partagent la préparation du profil isolé.
 
 Attention : le connecteur amont expose aussi des commandes d'écriture mémoire.
-Le diagnostic ne les envoie pas, mais ce service doit rester sur loopback,
+Le mode par défaut ne les envoie pas, mais ce service doit rester sur loopback,
 sans redirection de port et sur une machine de confiance.
 
 Ces échanges ne sont pas le protocole WebSocket du serveur Archipelago.
@@ -119,8 +120,59 @@ La comparaison échoue si la référence est indisponible ou si la mémoire diff
 Les octets ne sont pas enregistrés dans les résultats JSON.
 
 Cette option ne lit aucune variable de progression et n'envoie aucune écriture.
-Le mode sans `--read-code` reste limité aux métadonnées.
+Le mode sans `--read-code` ni `--seed-save` reste limité aux métadonnées.
 Voir le [rapport 004](../docs/reports/004-rom-identity-and-read.md).
+
+## Inventaire via le connecteur AP
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "/chemin/vers/OR-verifie.3ds" \
+  --seed-save "/chemin/prive/00000001/main" --speed 400 --timeout 150
+```
+
+Importe uniquement `main` et son archive `00000001.metadata` de 16 octets.
+Les 58 CRC sont obligatoires. La ROM doit avoir un profil mémoire documenté
+pour son SHA-256 exact ; AS n'est pas accepté pour cet essai.
+
+Le wrapper ouvre la partie et la poche Médecine par boutons natifs avant
+de lancer le connecteur amont intact. Deux connexions lisent chacune le
+préfixe de code ROM et l'inventaire complet via l'API Python AP.
+`--seed-save` implique ces lectures, sans nécessiter `--read-code`.
+`--steps` remplace la macro de démarrage ; inspecter les captures `boot/`.
+
+### Écriture expérimentale : une Potion seulement
+
+**Cette option modifie uniquement une nouvelle copie privée. Elle ne doit pas être
+utilisée comme mécanisme de livraison Archipelago ni sur une sauvegarde principale.**
+
+Ajouter `--experimental-potion-1-to-2` à la commande précédente :
+
+- ROM OR, adresse, domaine et préfixe de code strictement autorisés par l'essai.
+- Potion déjà présente dans le slot 0 Médecine, quantité exactement 1.
+- Une soumission `guarded_write` : gardes sur code et bloc inventaire complet,
+  puis écriture de **2 octets** à `0x08C6B5F2`, quantité 2.
+- Relecture complète immédiate, puis nouvelle connexion avec mêmes contrôles.
+- Aucun autre octet d'inventaire ne peut différer de la référence attendue.
+- Macro native SAVE déclenchée seulement après ces comparaisons.
+- Arrêt sans réessai si garde rejetée, réponse perdue ou valeur incohérente.
+- Vérification du fichier résultant et de ses 58 CRC après fermeture.
+
+`write_allowed: false` reste inchangé dans le catalogue de recherche : aucun
+accès générique en écriture n'est autorisé. L'exception est codée séparément et
+n'accepte aucune adresse, quantité ou valeur de remplacement libre.
+La macro suppose le contexte UI connu ; aucun détecteur général combat/menu
+n'existe. Le rechargement à froid reste une vérification distincte.
+
+Le dossier de réussite contient un `profile.json` compatible avec
+`run_bizhawk_save_probe.py --session /tmp/opencode/oras-connector-IDENTIFIANT`.
+Pour revoir Médecine après redémarrage, utiliser les étapes de démarrage
+documentées dans le [rapport 008](../docs/reports/008-connector-inventory-and-write.md).
+Le JSON distingue soumission d'écriture, accusé réseau, relecture RAM et fichier
+sauvegardé. Les gardes sont comptées séparément des requêtes `READ`.
+Une erreur de handler Lua dans le connecteur amont ne garantit pas l'annulation
+du reste du lot : résultat alors inconnu, sans nouvelle écriture ni SAVE
+déclenché. Voir les limites du rapport ; ce n'est pas une transaction générale.
 
 ## Créer une sauvegarde jouable dans un profil privé
 

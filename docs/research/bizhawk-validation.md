@@ -4,9 +4,10 @@ Statut au 17 novembre 2026 :
 
 - Deux éditions : menu, domaines Lua, transport TCP et lecture de code vérifiés.
 - OR : partie native rechargée, lecture de quantité corrélée au sac,
-  variation Potion 1 → 0 et persistance native vérifiées.
+  variation Potion 1 → 0 et persistance native vérifiées ; inventaire via API AP,
+  écriture gardée 1 → 2 et rechargement natif également vérifiés.
 - AS : aucune sauvegarde jouable ni variable de progression encore validée.
-- Inventaire via le pont AP, écriture distante et boucle serveur : non validés.
+- Boucle serveur, index persistants et livraison idempotente : non validés.
 
 Historique des preuves :
 
@@ -16,9 +17,11 @@ Historique des preuves :
 - [005 — préparation du profil](../reports/005-private-save-profile.md).
 - [006 — rechargement et inventaire statique](../reports/006-native-reload-and-inventory.md).
 - [007 — variation et persistance natives](../reports/007-native-quantity-and-persistence.md).
+- [008 — inventaire via AP et écriture gardée](../reports/008-connector-inventory-and-write.md).
 
 Une reconnexion de métadonnées ne suffit pas à valider la reprise des items
-ou des pointeurs exigée par BH-09.
+ou des pointeurs exigée par BH-09. Sur OR, l'inventaire a aussi été recontrôlé
+après écriture et reconnexion ; aucun item reçu depuis le serveur n'est impliqué.
 
 ## Conditions préalables
 
@@ -139,7 +142,7 @@ La matrice reste indépendante :
 
 | Configuration | Démarrage/sauvegarde | Lua/domaines | TCP métadonnées/reconnexion | Lecture variable | Écriture/persistance | Événement | E2E AP |
 |---|---|---|---|---|---|---|---|
-| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid ; quantité native persistante | Inventaire validé | Validé | Potion 1 → 0 corrélée au sac | Non testé | Non testé | Non testé |
+| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid ; quantité persistante | Inventaire validé | Validé | Lua et API AP ; avant/après reconnexion | Potion 1 → 2 gardée, 58 CRC, sac ×2 après redémarrage | Non testé | Non testé |
 | Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
 
 ## Politique de repli

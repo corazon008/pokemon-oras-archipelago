@@ -1,5 +1,5 @@
 -- Wrap the unmodified upstream connector with a local-file shutdown signal.
--- No game memory reads/writes, input, save operations, or extra network handlers.
+-- Optional native UI boot; memory/network handlers remain upstream and unmodified.
 
 local directory = assert(os.getenv("ORAS_CONNECTOR_DIRECTORY"))
 local stop_path = assert(os.getenv("ORAS_CONNECTOR_STOP"))
@@ -17,4 +17,8 @@ event.onframeend(function()
     end
 end, "ORAS connector probe shutdown")
 
+local boot = os.getenv("ORAS_CONNECTOR_BOOT")
+if boot then dofile(boot) end
+local post = os.getenv("ORAS_CONNECTOR_POST_SCRIPT")
+if post then dofile(post) end
 dofile(directory .. "/connector_bizhawk_generic.lua")

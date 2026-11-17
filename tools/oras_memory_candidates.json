@@ -26,7 +26,13 @@
         "/tmp/opencode/oras-save-1dqaca6j/attempt-_jian3iq"
       ],
       "native_differential_observation": "/tmp/opencode/oras-save-1dqaca6j/attempt-_ovw_882",
-      "status": "Read-only Potion quantity validated through native 1-to-0 change; writes remain unvalidated."
+      "bounded_write_experiment": {
+        "evidence": "/tmp/opencode/oras-connector-s2xbk_zf",
+        "cold_reload": "/tmp/opencode/oras-connector-s2xbk_zf/attempt-a5eoayw3",
+        "transition": "Medicine slot 0 Potion quantity 1 to 2",
+        "generic_writes_authorized": false
+      },
+      "status": "Inventory read via Lua/AP; isolated guarded Potion 1-to-2 persisted and cold-reloaded. No generic write authorization."
     }
   }
 }

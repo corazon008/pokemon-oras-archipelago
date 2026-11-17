@@ -64,6 +64,26 @@ def validate_save_container(source: Path) -> None:
     validate_save(source.read_bytes())
 
 
+def seed_archive(source: Path, destination: Path) -> dict:
+    """Copy only a validated main and its required Encore archive metadata."""
+    source = source.resolve()
+    metadata_source = source.parent.with_suffix(".metadata")
+    if not metadata_source.is_file() or metadata_source.stat().st_size != 16:
+        raise ValueError("Seed import requires its 16-byte Encore 00000001.metadata sibling")
+    source_hash, metadata_hash = sha256(source), sha256(metadata_source)
+    seed_save(source, destination)
+    metadata_target = destination.parent.with_suffix(".metadata")
+    with metadata_source.open("rb") as original, metadata_target.open("xb") as copied:
+        shutil.copyfileobj(original, copied)
+    if sha256(destination) != source_hash or sha256(metadata_target) != metadata_hash:
+        raise ValueError("Archive copy does not match the source")
+    return {
+        "seed_source": str(source), "seed_sha256": source_hash,
+        "archive_metadata_source": str(metadata_source),
+        "archive_metadata_sha256": metadata_hash,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bizhawk", type=Path, default=PROJECT_ROOT / "bin/BizHawk-2.11.1-linux-x64")
@@ -157,20 +177,7 @@ def main() -> int:
             "archive_metadata_sha256": None,
         }
         if args.seed_save:
-            metadata_source = args.seed_save.resolve().parent.with_suffix(".metadata")
-            if not metadata_source.is_file() or metadata_source.stat().st_size != 16:
-                parser.error(
-                    "Seed import requires its 16-byte Encore 00000001.metadata sibling; "
-                    "raw save conversion is not supported"
-                )
-            seed_save(args.seed_save, save_destination(runtime, identity["program_id"]))
-            metadata_target = save_destination(runtime, identity["program_id"]).parent.with_suffix(".metadata")
-            with metadata_source.open("rb") as original, metadata_target.open("xb") as copied:
-                shutil.copyfileobj(original, copied)
-            manifest["archive_metadata_source"] = str(metadata_source)
-            manifest["archive_metadata_sha256"] = sha256(metadata_source)
-            if sha256(metadata_target) != manifest["archive_metadata_sha256"]:
-                raise ValueError("Archive metadata copy does not match the source")
+            manifest.update(seed_archive(args.seed_save, save_destination(runtime, identity["program_id"])))
         (session / "profile.json").write_text(json.dumps(manifest, indent=2) + "\n")
     attempt = Path(tempfile.mkdtemp(prefix="attempt-", dir=session))
     plan = attempt / "steps.txt"

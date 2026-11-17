@@ -1,4 +1,4 @@
-"""Test upstream TCP metadata; optionally compare a ROM-derived text prefix in RAM."""
+"""Probe upstream AP transport in fresh private profiles; optional bounded Potion experiment."""
 
 from __future__ import annotations
 
@@ -19,6 +19,12 @@ from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, prepare_runtime, sha256,
 )
 from rom_identity import CodeReference, inspect_rom, sha256_file
+from run_bizhawk_save_probe import parse_steps, save_destination, seed_archive
+from oras_connector_inventory import (
+    BOOT_MEDICINE_STEPS, NATIVE_SAVE_STEPS, InventoryReference,
+    add_experimental_potion, load_inventory_reference, potion_transition, read_inventory,
+)
+from oras_save import inspect_save, inventory_bytes
 
 
 REQUESTS = (
@@ -70,13 +76,21 @@ def validate_responses(responses: list) -> None:
 
 
 async def exercise_connector(api, process, timeout: float,
-                             code_reference: CodeReference | None = None,
-                             audit: dict | None = None) -> list[dict]:
+                              code_reference: CodeReference | None = None,
+                              audit: dict | None = None,
+                              inventory_reference: InventoryReference | None = None,
+                              potion_rom_hash: str | None = None) -> list[dict]:
+    if potion_rom_hash is not None:
+        if code_reference is None or inventory_reference is None or audit is None:
+            raise ValueError("Potion experiment requires code, inventory and audit")
+        potion_transition(potion_rom_hash, code_reference, inventory_reference)
     exchanges = []
+    if audit is not None:
+        audit["exchanges"] = exchanges
     context = api.BizHawkContext()
     deadline = asyncio.get_running_loop().time() + timeout
     try:
-        for attempt in range(2):
+        for attempt in range(3 if potion_rom_hash else 2):
             await connect_until_ready(api, context, process, deadline)
             version = await api.get_script_version(context)
             if version != 1:
@@ -105,6 +119,14 @@ async def exercise_connector(api, process, timeout: float,
                     "sha256": hashlib.sha256(payloads[0]).hexdigest(),
                     "matches_rom_prefix": True,
                 }
+            if inventory_reference is not None:
+                if code_reference is None or audit is None:
+                    raise ValueError("Inventory reads require a runtime code guard and audit")
+                exchange["inventory_read"] = await read_inventory(api, context, inventory_reference, audit)
+            if potion_rom_hash is not None and attempt == 1:
+                inventory_reference = await add_experimental_potion(
+                    api, context, potion_rom_hash, code_reference, inventory_reference, audit,
+                )
             exchanges.append(exchange)
             writer = context.streams[1]
             api.disconnect(context)
@@ -114,11 +136,30 @@ async def exercise_connector(api, process, timeout: float,
     return exchanges
 
 
+async def finish_native_ui(process, signal: Path, marker: Path, timeout: float) -> None:
+    signal.touch()  # Only called after write readback and reconnection verification.
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
+        if marker.exists():
+            return
+        if process.poll() is not None:
+            raise RuntimeError("EmuHawk exited before native save macro completed")
+        await asyncio.sleep(0.1)
+    raise TimeoutError("Native save macro timed out; do not retry memory write")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bizhawk", type=Path, default=PROJECT_ROOT / "bin/BizHawk-2.11.1-linux-x64")
     parser.add_argument("--rom", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=60)
+    parser.add_argument("--seed-save", type=Path, help="Copy a validated save/archive; read inventory after native boot")
+    parser.add_argument("--steps", default=BOOT_MEDICINE_STEPS, help="Native boot/Bag steps, only with --seed-save")
+    parser.add_argument("--speed", type=int, default=100)
+    parser.add_argument(
+        "--experimental-potion-1-to-2", action="store_true",
+        help="One guarded 2-byte write in a fresh seeded copy, then native save; never an AP delivery",
+    )
     parser.add_argument(
         "--read-code", action="store_true",
         help="Compare a 64-byte text prefix at the virtual address derived from the ROM ExHeader",
@@ -129,6 +170,14 @@ def main() -> int:
         parser.error("This pinned LuaSocket bundle targets Linux x86_64")
     if not math.isfinite(args.timeout) or args.timeout <= 0:
         parser.error("Timeout must be positive and finite")
+    if not 1 <= args.speed <= 1000:
+        parser.error("Speed must be between 1 and 1000 percent")
+    if args.experimental_potion_1_to_2 and not args.seed_save:
+        parser.error("--experimental-potion-1-to-2 requires --seed-save (fresh private copy)")
+    try:
+        steps = parse_steps(args.steps)
+    except ValueError as error:
+        parser.error(str(error))
     if not (source / "EmuHawk.exe").is_file() or not rom.is_file():
         parser.error("BizHawk executable and ROM must exist")
     mono = shutil.which("mono")
@@ -149,9 +198,11 @@ def main() -> int:
         "rom": str(rom),
     }
     process = None
+    archive = None
     try:
         code_reference = None
-        if args.read_code:
+        inventory_reference = None
+        if args.read_code or args.seed_save:
             identity, code_reference = inspect_rom(rom)
             if identity["edition_from_program_id"] is None or code_reference is None:
                 raise ValueError("ROM has no supported ORAS text-prefix reference")
@@ -162,6 +213,18 @@ def main() -> int:
         lock = fetch_bundle(bundle)
         api = load_upstream_api(bundle, lock)
         runtime = prepare_runtime(source, session)
+        if args.seed_save:
+            inventory_reference = load_inventory_reference(
+                identity["rom_sha256"], identity["program_id"], args.seed_save,
+            )
+            archive = seed_archive(args.seed_save, save_destination(runtime, identity["program_id"]))
+            report["archive"] = archive
+            report["scope"] = "TCP metadata, code and validated inventory reads, including reconnection"
+            report["native_boot_steps"] = steps
+            report["speed_percent"] = args.speed
+            if args.experimental_potion_1_to_2:
+                potion_transition(identity["rom_sha256"], code_reference, inventory_reference)
+                report["scope"] = "Experimental guarded Potion 1-to-2, readback, reconnect and native save"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -171,6 +234,29 @@ def main() -> int:
             "ORAS_CONNECTOR_STOP": str(stop_file),
             "ORAS_CONNECTOR_TIMEOUT": str(math.ceil(args.timeout) + 10),
         })
+        if args.seed_save:
+            capture = session / "boot"
+            capture.mkdir()
+            plan = capture / "steps.txt"
+            plan.write_text("".join(f"{frames}:{names}\n" for frames, names in steps))
+            env.update({
+                "ORAS_CONNECTOR_BOOT": str(PROJECT_ROOT / "tools/bizhawk_ui_probe.lua"),
+                "ORAS_UI_PLAN": str(plan), "ORAS_UI_CAPTURE": str(capture),
+                "ORAS_UI_SPEED": str(args.speed), "ORAS_UI_CONTINUE": "1",
+            })
+        if args.experimental_potion_1_to_2:
+            post = session / "native-save"
+            post.mkdir()
+            post_plan = post / "steps.txt"
+            post_steps = parse_steps(NATIVE_SAVE_STEPS)
+            post_plan.write_text("".join(f"{frames}:{names}\n" for frames, names in post_steps))
+            report["native_save_steps"] = post_steps
+            env.update({
+                "ORAS_CONNECTOR_POST_SCRIPT": str(PROJECT_ROOT / "tools/bizhawk_connector_post_ui.lua"),
+                "ORAS_CONNECTOR_POST_PLAN": str(post_plan),
+                "ORAS_CONNECTOR_POST_CAPTURE": str(post),
+                "ORAS_CONNECTOR_POST_SIGNAL": str(session / "finish-ui"),
+            })
         command = [
             mono, str(runtime / "EmuHawk.exe"),
             f"--config={runtime / 'config.ini'}", f"--lua={wrapper}", str(rom),
@@ -185,8 +271,19 @@ def main() -> int:
             process = subprocess.Popen(command, cwd=bundle, env=env, stdout=stdout, stderr=stderr)
             try:
                 report["exchanges"] = asyncio.run(
-                    exercise_connector(api, process, args.timeout, code_reference, report)
+                    asyncio.wait_for(
+                        exercise_connector(
+                            api, process, args.timeout, code_reference, report, inventory_reference,
+                            identity["rom_sha256"] if args.experimental_potion_1_to_2 else None,
+                        ),
+                        timeout=args.timeout,
+                    )
                 )
+                if args.experimental_potion_1_to_2:
+                    asyncio.run(finish_native_ui(
+                        process, session / "finish-ui", post / "complete", args.timeout,
+                    ))
+                    report["native_save_macro_completed"] = True
             finally:
                 stop_file.touch()
                 try:
@@ -198,6 +295,21 @@ def main() -> int:
         report["exit_code"] = process.returncode
         if process.returncode != 0 or report.get("forced_shutdown"):
             raise RuntimeError("EmuHawk did not shut down cleanly")
+        if args.seed_save:
+            target = save_destination(runtime, identity["program_id"])
+            report["resulting_save"] = inspect_save(target.read_bytes())
+            expected_inventory = (
+                potion_transition(identity["rom_sha256"], code_reference, inventory_reference).expected
+                if args.experimental_potion_1_to_2 else inventory_reference.expected
+            )
+            if inventory_bytes(target.read_bytes()) != expected_inventory:
+                raise ValueError("Saved inventory does not match expected experiment result")
+            report["saved_inventory_matches_expected"] = True
+            # A hash-bound manifest permits a subsequent cold reload with the native UI tool.
+            (session / "profile.json").write_text(json.dumps({
+                **archive, "kind": "oras_native_save_probe", "program_id": identity["program_id"],
+                "rom_sha256": identity["rom_sha256"],
+            }, indent=2) + "\n")
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"
@@ -206,6 +318,18 @@ def main() -> int:
         if process is not None and process.poll() is None:
             process.kill()
             process.wait()
+        if process is not None:
+            report["exit_code"] = process.returncode
+        if archive is not None:
+            for prefix in ("seed", "archive_metadata"):
+                try:
+                    unchanged = sha256(Path(archive[f"{prefix}_source"])) == archive[f"{prefix}_sha256"]
+                except OSError:
+                    unchanged = False
+                report[f"{prefix}_source_unchanged"] = unchanged
+                if not unchanged:
+                    report["status"] = "failed"
+                    report["error"] = "Source archive changed during the experiment"
         (session / "result.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     return 0 if report["status"] == "complete" else 1

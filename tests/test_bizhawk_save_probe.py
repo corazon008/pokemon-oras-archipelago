@@ -70,6 +70,40 @@ class SaveProbeTests(unittest.TestCase):
 
 @unittest.skipUnless(LUA, "Lua is not installed")
 class NativeInputTests(unittest.TestCase):
+    def test_connector_post_ui_waits_for_signal_and_never_calls_memory(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            root = Path(directory)
+            (root / "steps.txt").write_text("2:B\n3:-\n")
+            fixture = """
+local callback, frames, pressed = nil, 0, 0
+event = {onframeend=function(fn) callback=fn end}
+joypad = {get=function() return {B=false} end,
+          set=function(buttons) if buttons.B then pressed=pressed+1 end end}
+emu = {framecount=function() return frames end}
+client = {screenshot=function() end}
+memory = setmetatable({}, {__index=function() error("Unexpected memory API") end})
+dofile(%s)
+for i=1,5 do callback() end
+assert(pressed == 0)
+assert(not io.open(%s, "r"))
+local signal = assert(io.open(%s, "w")); signal:close()
+for i=1,6 do frames=frames+1; callback() end
+assert(pressed == 2)
+local complete = assert(io.open(%s, "r")); complete:close()
+"""
+            env = os.environ.copy()
+            env.update({
+                "ORAS_CONNECTOR_POST_PLAN": str(root / "steps.txt"),
+                "ORAS_CONNECTOR_POST_CAPTURE": str(root),
+                "ORAS_CONNECTOR_POST_SIGNAL": str(root / "signal"),
+            })
+            script = fixture % tuple(repr(str(path)) for path in [
+                ROOT / "tools/bizhawk_connector_post_ui.lua", root / "complete",
+                root / "signal", root / "complete",
+            ])
+            result = subprocess.run([LUA, "-"], input=script, env=env, text=True, capture_output=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_inventory_observer_samples_before_and_after_without_writes(self):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             root = Path(directory)

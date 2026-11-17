@@ -15,14 +15,16 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - Domaines mémoire et API Lua d'Encore identifiés dans les sources de BizHawk 2.11.1.
 - Les deux jeux atteignent le menu de langue ; inventaire Lua des domaines validé.
 - TCP Python ↔ connecteur AP et une reconnexion validés sur les deux jeux,
-  en métadonnées seulement.
+  en métadonnées ; inventaire également validé sur OR.
 - Title IDs et empreintes ROM relevés ; lecture d'un préfixe de code vérifiée
   sur les deux jeux, avant et après reconnexion.
 - OR : sauvegarde native rechargée en jeu, 58 CRC vérifiés, inventaire RAM
   concordant avec la sauvegarde et Potion ×1 affichée dans le sac.
 - OR : variation native Potion 1 → 0 et persistance après sauvegarde/redémarrage
-  validées dans la copie. Écriture RAM directe encore non validée.
-- Aucun offset de progression, flag de location, item ou patch ORAS approuvé.
+  validées dans la copie.
+- OR : lecture d'inventaire via API AP, écriture expérimentale gardée Potion
+  1 → 2, reconnexion et persistance native vérifiées sur copie isolée.
+- Aucun flag de location, ID Archipelago ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
 - Profil interactif isolé disponible ; sauvegarde OR jouable reçue et préservée.
 
@@ -38,13 +40,14 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Profil privé de sauvegarde — rapport 005](docs/reports/005-private-save-profile.md).
 - [Rechargement et lecture d'inventaire — rapport 006](docs/reports/006-native-reload-and-inventory.md).
 - [Variation native et persistance — rapport 007](docs/reports/007-native-quantity-and-persistence.md).
+- [Inventaire via AP et première écriture — rapport 008](docs/reports/008-connector-inventory-and-write.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Reproduire la lecture d'inventaire par le pont AP, puis tester une écriture
-contrôlée et sa persistance dans une nouvelle copie. Le développement du prototype
-Archipelago vient après ces preuves, pas à leur place.
+Identifier un événement permanent réel avec témoins négatifs et rechargement.
+La boucle serveur et la livraison idempotente restent à développer ; l'essai
+de quantité ne les remplace pas.
 
 Les ROMs, sauvegardes, dumps mémoire et fichiers extraits ne doivent pas être
 commités ou distribués. `.gitignore` fournit une protection de base, pas une
