@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "program_id": "000400000011C400",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "source_save": {
+    "session": "/tmp/opencode/oras-save-utuw0b7e",
+    "sha256": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+    "size_bytes": 483328,
+    "valid_crc_blocks": 58,
+    "inventory_sha256": "a8409c414c82a9a49b292de7a14dd3a35faa694f7938dfb3883830f8d59a8a8c",
+    "source_unchanged": true
+  },
+  "cold_reload": {
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-5gnhcod4",
+    "observed_continue_menu": true,
+    "observed_playable_house": true,
+    "exit_code": 0,
+    "savestate_used": false
+  },
+  "rejected_candidate": {
+    "address": "0x08C6EC70",
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-qtyx9egb",
+    "matches_save": false
+  },
+  "heap_search": {
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-zq1wp15p",
+    "start": "0x08000000",
+    "end_exclusive": "0x10000000",
+    "chunk_size": 1048576,
+    "read_operations": 128,
+    "matches": ["0x08C6AC80"],
+    "exit_code": 1,
+    "limitation": "Search finished; SDL host-input exception occurred on shutdown."
+  },
+  "static_inventory_reads": {
+    "domain": "System Bus",
+    "address": "0x08C6AC80",
+    "length": 2960,
+    "medicine_slot_0_item_id": 17,
+    "medicine_slot_0_quantity": 1,
+    "observed_ui_item": "Potion",
+    "observed_ui_quantity": 1,
+    "clean_evidence": [
+      "/tmp/opencode/oras-save-1dqaca6j/attempt-yx5y37qg",
+      "/tmp/opencode/oras-save-1dqaca6j/attempt-_jian3iq"
+    ],
+    "memory_write_operations": 0,
+    "native_quantity_change_validated": false,
+    "write_authorized": false
+  },
+  "host_input_workaround": {
+    "automated_child_env": {"SDL_JOYSTICK_HIDAPI": "0"},
+    "interactive_input_drivers_changed": false,
+    "tested_clean_runs": 2,
+    "universal_fix_claimed": false
+  }
+}

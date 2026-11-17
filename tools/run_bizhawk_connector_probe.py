@@ -165,7 +165,7 @@ def main() -> int:
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
-        env = emulator_environment(runtime)
+        env = emulator_environment(runtime, automated=True)
         env.update({
             "ORAS_CONNECTOR_DIRECTORY": str(bundle),
             "ORAS_CONNECTOR_STOP": str(stop_file),

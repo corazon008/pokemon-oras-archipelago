@@ -7,11 +7,11 @@ import json
 import math
 from pathlib import Path
 import shutil
-import struct
 import subprocess
 import tempfile
 
 from rom_identity import inspect_rom, sha256_file
+from oras_save import validate_save, inventory_bytes, inventory_entries
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
@@ -58,14 +58,10 @@ def seed_save(source: Path, destination: Path) -> None:
 
 
 def validate_save_container(source: Path) -> None:
-    """PKHeX SaveUtil's size/footer identification only, not full block CRC validation."""
+    """Validate ORAS size, footer, descriptors and all 58 block CRCs before import."""
     if source.stat().st_size != 0x76000:
         raise ValueError("Expected a 0x76000-byte ORAS decrypted main save; no conversion is performed")
-    with source.open("rb") as savedata:
-        savedata.seek(-0x1F0, 2)
-        marker = struct.unpack("<I", savedata.read(4))[0]
-    if marker != 0x42454546:
-        raise ValueError("Save lacks the ORAS footer marker; uninitialized/encrypted files are not imported")
+    validate_save(source.read_bytes())
 
 
 def main() -> int:
@@ -76,9 +72,18 @@ def main() -> int:
     parser.add_argument("--session", type=Path, help="Reuse a profile created by this tool; never reseed it")
     parser.add_argument("--steps", default="180:-")
     parser.add_argument("--timeout", type=float, default=180)
+    parser.add_argument("--speed", type=int, default=100, help="Automated emulation speed in percent")
     parser.add_argument(
         "--interactive", action="store_true",
         help="Open the private profile for manual play; no macro or automatic timeout",
+    )
+    parser.add_argument(
+        "--read-inventory", action="store_true",
+        help="Compare a source-documented read-only candidate with this profile's validated save",
+    )
+    parser.add_argument(
+        "--scan-inventory", action="store_true",
+        help="Search the documented application heap for this validated save's inventory",
     )
     args = parser.parse_args()
     try:
@@ -89,6 +94,12 @@ def main() -> int:
         parser.error("Timeout must be positive and finite")
     if args.session and args.seed_save:
         parser.error("--session and --seed-save are mutually exclusive")
+    if args.read_inventory and args.scan_inventory:
+        parser.error("Choose a single inventory observation mode")
+    if args.interactive and (args.read_inventory or args.scan_inventory or args.speed != 100):
+        parser.error("Interactive mode does not support memory observation or speed overrides")
+    if not 1 <= args.speed <= 1000:
+        parser.error("Speed must be between 1 and 1000 percent")
     if args.seed_save:
         try:
             validate_save_container(args.seed_save)
@@ -125,7 +136,7 @@ def main() -> int:
             "rom_sha256": rom_hash,
             "seed_source": str(args.seed_save.resolve()) if args.seed_save else None,
             "seed_sha256": sha256(args.seed_save) if args.seed_save else None,
-            "seed_validation": "size_footer_and_copy_integrity_only" if args.seed_save else "none",
+            "seed_validation": "58_block_crcs_and_copy_integrity" if args.seed_save else "none",
             "archive_metadata_source": None,
             "archive_metadata_sha256": None,
         }
@@ -148,11 +159,44 @@ def main() -> int:
     attempt = Path(tempfile.mkdtemp(prefix="attempt-", dir=session))
     plan = attempt / "steps.txt"
     plan.write_text("".join(f"{frames}:{names}\n" for frames, names in steps))
-    env = emulator_environment(runtime)
-    env.update({"ORAS_UI_PLAN": str(plan), "ORAS_UI_CAPTURE": str(attempt)})
+    env = emulator_environment(runtime, automated=not args.interactive)
+    env.update({
+        "ORAS_UI_PLAN": str(plan), "ORAS_UI_CAPTURE": str(attempt),
+        "ORAS_UI_SPEED": str(args.speed),
+    })
+    reference = None
+    candidate = None
+    if args.read_inventory or args.scan_inventory:
+        candidates = json.loads((PROJECT_ROOT / "tools/oras_memory_candidates.json").read_text())
+        candidate = candidates["profiles"].get(rom_hash)
+        if candidate is None or candidate["program_id"] != identity["program_id"]:
+            parser.error("No documented inventory candidate for this exact ROM")
+        if candidate["write_allowed"] or candidate["domain"] != "System Bus":
+            parser.error("This tool only supports read-only System Bus candidates")
+        target = save_destination(runtime, identity["program_id"])
+        reference = inventory_bytes(target.read_bytes())
+        if len(reference) != candidate["inventory_length"] or not any(reference):
+            parser.error("Inventory reference must have the documented length and nonzero contents")
+        env.update({
+            "ORAS_UI_SCRIPT": str(PROJECT_ROOT / "tools/bizhawk_ui_probe.lua"),
+            "ORAS_UI_CONTINUE": "1",
+            "ORAS_INVENTORY_ADDRESS": str(int(candidate["inventory_address"], 16)),
+            "ORAS_INVENTORY_LENGTH": str(candidate["inventory_length"]),
+        })
+        if args.scan_inventory:
+            reference_path = attempt / "inventory-reference.bin"
+            reference_path.write_bytes(reference)
+            env.update({
+                "ORAS_INVENTORY_REFERENCE": str(reference_path),
+                "ORAS_INVENTORY_SEARCH_SCRIPT": str(PROJECT_ROOT / "tools/inventory_search.lua"),
+            })
     command = [mono, str(runtime / "EmuHawk.exe"), f"--config={runtime / 'config.ini'}"]
     if not args.interactive:
-        command.append(f"--lua={PROJECT_ROOT / 'tools/bizhawk_ui_probe.lua'}")
+        if args.scan_inventory:
+            script = "bizhawk_inventory_search.lua"
+        else:
+            script = "bizhawk_inventory_probe.lua" if args.read_inventory else "bizhawk_ui_probe.lua"
+        command.append(f"--lua={PROJECT_ROOT / 'tools' / script}")
     command.append(str(rom))
     report = {
         "scope": "Native UI only; no direct memory requests",
@@ -160,6 +204,8 @@ def main() -> int:
         "memory_read_requests": 0,
         "memory_write_requests": 0,
         "interactive": args.interactive,
+        "speed_percent": args.speed,
+        "host_hidapi_disabled_for_automation": not args.interactive,
     }
     print(f"Private save session: {session}\nAttempt: {attempt}", flush=True)
     with (attempt / "stdout.txt").open("w") as stdout, (attempt / "stderr.txt").open("w") as stderr:
@@ -183,6 +229,31 @@ def main() -> int:
     target = save_destination(runtime, identity["program_id"])
     report["native_save_exists"] = target.exists()
     report["native_save_sha256"] = sha256(target) if target.exists() else None
+    if args.read_inventory:
+        report["scope"] = "Native UI and one explicit read-only inventory candidate"
+        report["memory_read_requests"] = int((attempt / "inventory-requested").exists())
+        observed_path = attempt / "inventory-read.bin"
+        matches = observed_path.exists() and observed_path.read_bytes() == reference
+        report["inventory_read"] = {
+            "candidate_address": candidate["inventory_address"],
+            "domain": candidate["domain"],
+            "length": len(reference),
+            "matches_validated_save": matches,
+            "reference_entries": inventory_entries(reference),
+        }
+        report["complete"] = report["complete"] and matches
+    if args.scan_inventory:
+        report["scope"] = "Read-only exact inventory search in Encore's documented application heap"
+        journal = attempt / "inventory-scan-reads.txt"
+        report["memory_read_requests"] = len(journal.read_text().splitlines()) if journal.exists() else 0
+        matches_path = attempt / "inventory-matches.txt"
+        matches = matches_path.read_text().splitlines() if matches_path.exists() else []
+        report["inventory_scan"] = {
+            "domain": "System Bus", "start": "0x08000000", "end_exclusive": "0x10000000",
+            "matches": matches, "unique_match": len(matches) == 1,
+            "length": len(reference), "reference_entries": inventory_entries(reference),
+        }
+        report["complete"] = report["complete"] and matches_path.exists() and len(matches) == 1
     (attempt / "result.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     return 0 if (

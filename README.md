@@ -18,10 +18,12 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
   en métadonnées seulement.
 - Title IDs et empreintes ROM relevés ; lecture d'un préfixe de code vérifiée
   sur les deux jeux, avant et après reconnexion.
-- Partie jouable, sauvegarde et lecture/écriture d'une variable encore non validées.
+- OR : sauvegarde native rechargée en jeu, 58 CRC vérifiés, inventaire RAM
+  concordant avec la sauvegarde et Potion ×1 affichée dans le sac.
+- Variation native de quantité et écriture RAM encore non validées.
 - Aucun offset de progression, flag de location, item ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
-- Profil interactif isolé disponible ; sauvegarde jouable encore nécessaire.
+- Profil interactif isolé disponible ; sauvegarde OR jouable reçue et préservée.
 
 ## Documents
 
@@ -33,13 +35,13 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Connecteur TCP — rapport 003](docs/reports/003-bizhawk-tcp.md).
 - [Identité ROM et lecture mémoire — rapport 004](docs/reports/004-rom-identity-and-read.md).
 - [Profil privé de sauvegarde — rapport 005](docs/reports/005-private-save-profile.md).
+- [Rechargement et lecture d'inventaire — rapport 006](docs/reports/006-native-reload-and-inventory.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Créer une sauvegarde de test jouable dans le
-[profil interactif isolé](tools/README.md#créer-une-sauvegarde-jouable-dans-un-profil-privé),
-puis vérifier la lecture d'une variable identifiée. Écriture
+Vérifier une variation native de quantité dans la copie isolée et son
+rechargement, puis reproduire la lecture par le pont AP. Écriture
 contrôlée et persistance viendront ensuite. Le développement du prototype
 Archipelago vient après ces preuves, pas à leur place.
 

@@ -160,13 +160,48 @@ Cela signifie attendre 180 frames, appuyer sur A pendant deux frames, puis
 attendre 120 frames. Chaque étape produit une capture privée. Seuls les boutons
 ordinaires sont autorisés ; pas de Reset, toucher ou code Lua arbitraire.
 
-`--seed-save` peut importer une copie d'un `main` reconnu par taille et marqueur
-ORAS. Son fichier Encore `00000001.metadata` de 16 octets doit être présent à
+`--seed-save` peut importer une copie d'un `main` validé par taille, marqueur,
+descripteurs et CRC ORAS. Son fichier Encore `00000001.metadata` de 16 octets doit être présent à
 côté du dossier `00000001/`. Aucun déchiffrement ou conversion n'est tenté.
-Ce contrôle ne remplace pas une validation complète des CRC ni un chargement
-effectif par le jeu. `--seed-save` et `--session` sont incompatibles pour éviter
+Ce contrôle ne remplace pas un chargement effectif par le jeu.
+`--seed-save` et `--session` sont incompatibles pour éviter
 de réinitialiser une sauvegarde de travail.
 
-Le candidat trouvé lors de la recherche initiale n'a pas le marqueur attendu ;
-il est refusé par le contrôle final. Voir le
+Le candidat trouvé lors de la recherche initiale n'avait pas le marqueur attendu.
+Une nouvelle sauvegarde native a depuis été fournie et rechargée. Voir le
 [rapport 005](../docs/reports/005-private-save-profile.md).
+
+## Vérifier une sauvegarde et observer son inventaire
+
+```sh
+python3 tools/oras_save.py /chemin/prive/00000001/main
+```
+
+Cette inspection vérifie désormais les **58 CRC et descripteurs ORAS**, puis
+affiche les objets et quantités sans lire les noms du joueur ou ses identifiants.
+Le contrôle est aussi obligatoire avant un nouvel import.
+
+Après création d'une copie de travail, les options de recherche sont :
+
+- `--read-inventory` : une lecture bornée à l'adresse documentée pour le SHA-256
+  de cette ROM, comparée au bloc de sauvegarde validé.
+- `--scan-inventory` : recherche exacte dans le tas applicatif documenté d'Encore ;
+  aucune adresse d'inventaire n'est supposée.
+- Ces modes sont exclusifs et interdits en mode interactif.
+- La référence doit contenir des données non nulles. Zéro ou plusieurs résultats
+  ne sont pas automatiquement promus en adresse utilisable.
+- `--speed 400` accélère les pas natifs automatisés ; le profil est remis à
+  100 % à la prochaine préparation.
+
+Les lectures sont faites après les `--steps` de démarrage/chargement et de menu.
+Leur durée dépend du jeu : une macro terminée ne prouve pas que le bon écran a
+été atteint. Inspecter les captures privées.
+
+Les modes mémoire sont **strictement en lecture**. L'adresse retenue pour OR
+est restreinte au build identifié ; elle n'autorise pas d'écriture et n'est
+pas transposée à AS. Le candidat du plugin Gen6 a échoué sur ce build.
+
+Le lanceur désactive HIDAPI dans les processus automatisés seulement, pour
+contourner une exception SDL observée à la fermeture. Les entrées physiques
+des sessions interactives ne sont pas modifiées.
+Voir le [rapport 006](../docs/reports/006-native-reload-and-inventory.md).

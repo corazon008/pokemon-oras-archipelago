@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "warning": "Read-only research candidates, never authorization to write game memory.",
+  "profiles": {
+    "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4": {
+      "program_id": "000400000011C400",
+      "domain": "System Bus",
+      "inventory_address": "0x08C6AC80",
+      "inventory_length": 2960,
+      "write_allowed": false,
+      "provenance": {
+        "method": "Unique exact match of a CRC-validated inventory block in Encore's documented heap",
+        "local_evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-zq1wp15p",
+        "range_source": "CasualPokePlayer/encore@49a332221e1c9dffcc2c52f85a1765b1951c222f/src/core/memory.h"
+      },
+      "rejected_plugin_candidate": {
+        "address": "0x08C6EC70",
+        "source_repository": "biometrix76/Gen6CTRPluginFramework",
+        "source_commit": "25ca82746c23ad194c772a2b3266bf5042e3a370",
+        "source_path": "Sources/PKHeX.cpp",
+        "source_function": "UpdateItems",
+        "matches_this_build": false
+      },
+      "verified_read_observations": [
+        "/tmp/opencode/oras-save-1dqaca6j/attempt-yx5y37qg",
+        "/tmp/opencode/oras-save-1dqaca6j/attempt-_jian3iq"
+      ],
+      "status": "Exact static matches in two clean runs; native differential validation still required."
+    }
+  }
+}

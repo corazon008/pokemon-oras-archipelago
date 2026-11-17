@@ -15,7 +15,8 @@
         "src/core/loader/ncch.cpp",
         "src/core/file_sys/archive_source_sd_savedata.cpp",
         "src/core/file_sys/archive_savedata.cpp",
-        "src/core/file_sys/savedata_archive.cpp"
+        "src/core/file_sys/savedata_archive.cpp",
+        "src/core/memory.h"
       ],
       "note": "Container metadata and text mapping; no offsets inferred from filenames."
     },
@@ -59,6 +60,8 @@
         "src/BizHawk.Client.Common/lua/CommonLibs/JoypadLuaLibrary.cs",
         "src/BizHawk.Emulation.Cores/Consoles/Nintendo/3DS/Encore.IInputPollable.cs",
         "src/BizHawk.Emulation.Cores/Consoles/Nintendo/3DS/Encore.cs",
+        "src/BizHawk.Bizware.Input/SDL2/SDL2InputAdapter.cs",
+        "src/BizHawk.Bizware.Input/SDL2/SDL2Gamepad.cs",
         "src/BizHawk.Client.Common/lua/CommonLibs/MemoryLuaLibrary.cs",
         "src/BizHawk.Client.Common/Api/Classes/MemoryApi.cs"
       ]
@@ -148,7 +151,11 @@
         "PKHeX.Core/Saves/Access/SaveBlockAccessor6AO.cs",
         "PKHeX.Core/Saves/Substructures/Gen6/EventWork6.cs",
         "PKHeX.Core/Saves/Substructures/Gen6/MyItem6AO.cs",
-        "PKHeX.Core/Saves/Util/SaveUtil.cs"
+        "PKHeX.Core/Saves/Util/SaveUtil.cs",
+        "PKHeX.Core/Saves/Blocks/BlockInfo3DS.cs",
+        "PKHeX.Core/Saves/Util/Checksums.cs",
+        "PKHeX.Core/Items/Bags/PlayerBag6AO.cs",
+        "PKHeX.Core/Saves/Substructures/Gen6/Misc6AO.cs"
       ],
       "note": "Decrypted save-file layout is not a runtime RAM address map."
     }

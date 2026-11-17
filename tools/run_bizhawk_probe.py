@@ -34,6 +34,7 @@ def isolate_config(config: dict, runtime: Path) -> dict:
     config["SingleInstanceMode"] = False
     config["AutosaveSaveRAM"] = False
     config["SoundEnabled"] = False
+    config["SpeedPercent"] = 100
     entries = config.setdefault("PathEntries", {})
     entries["UseRecentForRoms"] = False
     entries["LastRomPath"] = str(runtime)
@@ -87,13 +88,17 @@ def prepare_runtime(source: Path, session: Path) -> Path:
     return runtime
 
 
-def emulator_environment(runtime: Path) -> dict[str, str]:
+def emulator_environment(runtime: Path, *, automated: bool = False) -> dict[str, str]:
     env = os.environ.copy()
     env.update({
         "LD_LIBRARY_PATH": f"{runtime}/dll:{runtime}:/usr/lib",
         "MONO_CRASH_NOFILE": "1",
         "MONO_WINFORMS_XIM_STYLE": "disabled",
     })
+    if automated:
+        # Avoid the observed SDL HID gamepad shutdown race in automated tests.
+        # Interactive sessions retain the user's input drivers.
+        env["SDL_JOYSTICK_HIDAPI"] = "0"
     return env
 
 
@@ -123,7 +128,7 @@ def main() -> int:
     session = Path(tempfile.mkdtemp(prefix="oras-bizhawk-", dir=temporary_root))
     runtime = prepare_runtime(source, session)
     report_path = session / "capabilities.json"
-    env = emulator_environment(runtime)
+    env = emulator_environment(runtime, automated=True)
     env.update({
         "ORAS_PROBE_OUTPUT": str(report_path),
         "ORAS_PROBE_FRAMES": str(args.frames),

@@ -13,6 +13,9 @@ d'une variable de progression exigée par BH-04.
 Le [rapport 005](../reports/005-private-save-profile.md) prépare le profil privé.
 Le candidat `main` existant n'étant pas reconnu, une sauvegarde native jouable
 reste nécessaire avant les tests de progression.
+Le [rapport 006](../reports/006-native-reload-and-inventory.md) valide désormais
+le rechargement natif OR et une concordance statique inventaire sauvegarde/RAM/UI.
+La variation de quantité et l'application distante restent à tester.
 
 ## Conditions préalables
 
@@ -133,7 +136,7 @@ La matrice reste indépendante :
 
 | Configuration | Démarrage/sauvegarde | Lua/domaines | TCP métadonnées/reconnexion | Lecture variable | Écriture/persistance | Événement | E2E AP |
 |---|---|---|---|---|---|---|---|
-| Rubis Oméga — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
+| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid | Inventaire validé | Validé | Inventaire statique concordant | Non testé | Non testé | Non testé |
 | Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
 
 ## Politique de repli

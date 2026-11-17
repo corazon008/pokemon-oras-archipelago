@@ -1,6 +1,9 @@
 -- Native controller actions in an isolated profile; no game memory API calls.
 local plan_path = assert(os.getenv("ORAS_UI_PLAN"))
 local capture = assert(os.getenv("ORAS_UI_CAPTURE"))
+local speed = tonumber(os.getenv("ORAS_UI_SPEED") or "100")
+assert(speed and speed >= 1 and speed <= 1000 and speed % 1 == 0)
+if speed ~= 100 then client.speedmode(speed) end
 local allowed = {
     A=true, B=true, X=true, Y=true, Up=true, Down=true, Left=true, Right=true,
     L=true, R=true, Start=true, Select=true,
@@ -38,4 +41,5 @@ end
 local complete = assert(io.open(capture .. "/complete", "w"))
 complete:write(tostring(emu.framecount()), "\n")
 complete:close()
+if os.getenv("ORAS_UI_CONTINUE") == "1" then return end
 client.exit()

@@ -4,7 +4,6 @@ from pathlib import Path
 import os
 import shutil
 import subprocess
-import struct
 import sys
 import tempfile
 import unittest
@@ -12,6 +11,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from run_bizhawk_save_probe import parse_steps, save_destination, seed_save, validate_save_container
+from save_fixtures import synthetic_save
 
 ROOT = Path(__file__).resolve().parents[1]
 LUA = shutil.which("lua5.4") or shutil.which("lua")
@@ -35,8 +35,7 @@ class SaveProbeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             root = Path(directory)
             source, target = root / "source", root / "copy/main"
-            data = bytearray(b"\x55" * 0x76000)
-            struct.pack_into("<I", data, len(data) - 0x1F0, 0x42454546)
+            data = synthetic_save(fill=0x55)
             source.write_bytes(data)
             seed_save(source, target)
             self.assertEqual(target.read_bytes(), source.read_bytes())

@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,17 @@ LUA = shutil.which("lua5.4") or shutil.which("lua")
 
 
 class IsolationTests(unittest.TestCase):
+    def test_automated_hidapi_filter_is_child_only(self):
+        with patch.dict(os.environ, {"SDL_JOYSTICK_HIDAPI": "1"}):
+            env = RUNNER.emulator_environment(Path("/private"), automated=True)
+            self.assertEqual(env["SDL_JOYSTICK_HIDAPI"], "0")
+            self.assertEqual(os.environ["SDL_JOYSTICK_HIDAPI"], "1")
+
+    def test_interactive_environment_preserves_input_drivers(self):
+        with patch.dict(os.environ, {"SDL_JOYSTICK_HIDAPI": "1"}):
+            env = RUNNER.emulator_environment(Path("/private"))
+            self.assertEqual(env["SDL_JOYSTICK_HIDAPI"], "1")
+
     def test_incomplete_or_wrong_system_reports_cannot_pass(self):
         report = {
             "status": "complete",
