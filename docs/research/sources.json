@@ -4,6 +4,19 @@
   "scope": "Upstream source references; runtime observations are recorded separately.",
   "sources": [
     {
+      "id": "encore-release",
+      "repository": "https://github.com/CasualPokePlayer/encore",
+      "commit": "49a332221e1c9dffcc2c52f85a1765b1951c222f",
+      "gitlink_from_bizhawk_release": "bdddf4a58aa1a022afb11dc73294a81a5aa7bbd5",
+      "inspected_paths": [
+        "src/core/file_sys/ncch_container.h",
+        "src/core/file_sys/ncch_container.cpp",
+        "src/core/loader/ncch.h",
+        "src/core/loader/ncch.cpp"
+      ],
+      "note": "Container metadata and text mapping; no offsets inferred from filenames."
+    },
+    {
       "id": "archipelago",
       "repository": "https://github.com/ArchipelagoMW/Archipelago",
       "ref": "main",

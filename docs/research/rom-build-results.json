@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "scope": "ROM metadata and a 64-byte mapped code-prefix comparison, not progression",
+  "layout_source_commit": "49a332221e1c9dffcc2c52f85a1765b1951c222f",
+  "layout_source_repository": "CasualPokePlayer/encore",
+  "common": {
+    "container": "NCSD",
+    "rom_size_bytes": 2147483648,
+    "ncch_offset_bytes": 16384,
+    "ncch_format_version": 2,
+    "exheader_remaster_version": 3,
+    "no_crypto_flag": true,
+    "commercial_update_version": null,
+    "region_verified": false,
+    "text_virtual_address": "0x00100000",
+    "code_compressed": true,
+    "code_uncompressed_prefix_size_bytes": 72,
+    "code_prefix_length": 64,
+    "code_prefix_sha256": "92a5b3013f2d27923be3975e2046cc5e52b110822436fd5c9a9077cfb8061659",
+    "read_domain": "System Bus",
+    "memory_read_requests_per_run": 2,
+    "memory_write_requests": 0,
+    "read_matches_rom_before_and_after_reconnection": true,
+    "process_exit_code": 0
+  },
+  "runs": [
+    {
+      "edition": "Pokemon Omega Ruby",
+      "program_id": "000400000011C400",
+      "product_code": "CTR-P-ECRA",
+      "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+      "text_size_bytes": 4691460,
+      "code_stored_size_bytes": 3039008,
+      "local_evidence_directory": "/tmp/opencode/oras-connector-rb8pkvz2"
+    },
+    {
+      "edition": "Pokemon Alpha Sapphire",
+      "program_id": "000400000011C500",
+      "product_code": "CTR-P-ECLA",
+      "rom_sha256": "f349613532dbcc124b11373fc03ed7dbf2addb3c4ac7b15c8674a7628ebafab4",
+      "text_size_bytes": 4691452,
+      "code_stored_size_bytes": 3039088,
+      "local_evidence_directory": "/tmp/opencode/oras-connector-9zljz0tn"
+    }
+  ]
+}

@@ -7,6 +7,9 @@ Voir le [rapport 002](../reports/002-bizhawk-capabilities.md) et les
 Le [rapport 003](../reports/003-bizhawk-tcp.md) valide en plus le transport TCP
 et une déconnexion/reconnexion sur les deux éditions, en métadonnées seulement.
 Cela ne suffit pas à valider BH-05 ou BH-09 dans leur totalité.
+Le [rapport 004](../reports/004-rom-identity-and-read.md) démontre une lecture
+de code comparée à la ROM sur chaque édition. Ce n'est pas encore la lecture
+d'une variable de progression exigée par BH-04.
 
 ## Conditions préalables
 

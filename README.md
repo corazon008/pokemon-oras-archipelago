@@ -16,8 +16,10 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - Les deux jeux atteignent le menu de langue ; inventaire Lua des domaines validé.
 - TCP Python ↔ connecteur AP et une reconnexion validés sur les deux jeux,
   en métadonnées seulement.
+- Title IDs et empreintes ROM relevés ; lecture d'un préfixe de code vérifiée
+  sur les deux jeux, avant et après reconnexion.
 - Partie jouable, sauvegarde et lecture/écriture d'une variable encore non validées.
-- Aucun offset RAM, flag de location, item ou patch ORAS approuvé.
+- Aucun offset de progression, flag de location, item ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
 
 ## Documents
@@ -28,6 +30,7 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Rapport de recherche 001](docs/reports/001-research.md).
 - [Premiers essais BizHawk — rapport 002](docs/reports/002-bizhawk-capabilities.md).
 - [Connecteur TCP — rapport 003](docs/reports/003-bizhawk-tcp.md).
+- [Identité ROM et lecture mémoire — rapport 004](docs/reports/004-rom-identity-and-read.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

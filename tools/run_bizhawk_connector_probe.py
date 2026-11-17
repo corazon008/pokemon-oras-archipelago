@@ -1,9 +1,10 @@
-"""Test upstream BizHawk TCP metadata and reconnection without accessing game RAM."""
+"""Test upstream TCP metadata; optionally compare a ROM-derived text prefix in RAM."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
 from pathlib import Path
@@ -17,6 +18,7 @@ from ap_connector_bundle import fetch_bundle, load_upstream_api
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, prepare_runtime, sha256,
 )
+from rom_identity import CodeReference, inspect_rom, sha256_file
 
 
 REQUESTS = (
@@ -67,7 +69,9 @@ def validate_responses(responses: list) -> None:
         raise ValueError("System Bus size API behavior changed; investigate")
 
 
-async def exercise_connector(api, process, timeout: float) -> list[dict]:
+async def exercise_connector(api, process, timeout: float,
+                             code_reference: CodeReference | None = None,
+                             audit: dict | None = None) -> list[dict]:
     exchanges = []
     context = api.BizHawkContext()
     deadline = asyncio.get_running_loop().time() + timeout
@@ -79,13 +83,29 @@ async def exercise_connector(api, process, timeout: float) -> list[dict]:
                 raise ValueError(f"Unexpected connector script version: {version}")
             responses = await api.send_requests(context, list(REQUESTS))
             validate_responses(responses)
-            exchanges.append({
+            exchange = {
                 "connection": attempt + 1,
                 "script_version": version,
                 "port": context._port,
                 "requests": list(REQUESTS),
                 "responses": responses,
-            })
+            }
+            if code_reference is not None:
+                if audit is not None:
+                    audit["memory_read_requests"] += 1
+                payloads = await api.read(context, [
+                    (code_reference.address, len(code_reference.expected), "System Bus"),
+                ])
+                if len(payloads) != 1 or payloads[0] != code_reference.expected:
+                    raise ValueError("Runtime code prefix does not match the selected ROM")
+                exchange["code_read"] = {
+                    "domain": "System Bus",
+                    "address": f"0x{code_reference.address:08X}",
+                    "length": len(payloads[0]),
+                    "sha256": hashlib.sha256(payloads[0]).hexdigest(),
+                    "matches_rom_prefix": True,
+                }
+            exchanges.append(exchange)
             writer = context.streams[1]
             api.disconnect(context)
             await writer.wait_closed()
@@ -99,6 +119,10 @@ def main() -> int:
     parser.add_argument("--bizhawk", type=Path, default=PROJECT_ROOT / "bin/BizHawk-2.11.1-linux-x64")
     parser.add_argument("--rom", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=60)
+    parser.add_argument(
+        "--read-code", action="store_true",
+        help="Compare a 64-byte text prefix at the virtual address derived from the ROM ExHeader",
+    )
     args = parser.parse_args()
     source, rom = args.bizhawk.resolve(), args.rom.resolve()
     if platform.system() != "Linux" or platform.machine() != "x86_64":
@@ -126,6 +150,14 @@ def main() -> int:
     }
     process = None
     try:
+        code_reference = None
+        if args.read_code:
+            identity, code_reference = inspect_rom(rom)
+            if identity["edition_from_program_id"] is None or code_reference is None:
+                raise ValueError("ROM has no supported ORAS text-prefix reference")
+            identity["rom_sha256"] = sha256_file(rom)
+            report["rom_identity"] = identity
+            report["scope"] = "TCP metadata and ROM-derived code-prefix reads only"
         bundle = session / "connector"
         lock = fetch_bundle(bundle)
         api = load_upstream_api(bundle, lock)
@@ -152,7 +184,9 @@ def main() -> int:
         with (session / "stdout.txt").open("w") as stdout, (session / "stderr.txt").open("w") as stderr:
             process = subprocess.Popen(command, cwd=bundle, env=env, stdout=stdout, stderr=stderr)
             try:
-                report["exchanges"] = asyncio.run(exercise_connector(api, process, args.timeout))
+                report["exchanges"] = asyncio.run(
+                    exercise_connector(api, process, args.timeout, code_reference, report)
+                )
             finally:
                 stop_file.touch()
                 try:

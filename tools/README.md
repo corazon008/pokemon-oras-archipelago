@@ -98,3 +98,26 @@ sans redirection de port et sur une machine de confiance.
 
 Ces échanges ne sont pas le protocole WebSocket du serveur Archipelago.
 Voir le [rapport 003](../docs/reports/003-bizhawk-tcp.md).
+
+## Identité ROM et preuve de lecture
+
+```sh
+python3 tools/rom_identity.py \
+  "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+
+python3 tools/run_bizhawk_connector_probe.py --read-code \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+```
+
+La première commande lit les en-têtes et calcule le SHA-256 complet sans modifier
+la ROM. Elle n'associe pas de numéro commercial à `remaster_version`.
+
+La seconde ajoute **deux lectures de 64 octets**, avant et après reconnexion,
+à l'adresse virtuelle du texte dérivée de l'ExHeader. La référence est prise
+dans le préfixe non compressé de `.code`, sans extraction sur disque.
+La comparaison échoue si la référence est indisponible ou si la mémoire diffère.
+Les octets ne sont pas enregistrés dans les résultats JSON.
+
+Cette option ne lit aucune variable de progression et n'envoie aucune écriture.
+Le mode sans `--read-code` reste limité aux métadonnées.
+Voir le [rapport 004](../docs/reports/004-rom-identity-and-read.md).

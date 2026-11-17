@@ -17,6 +17,7 @@ sys.path.insert(0, str(TOOLS))
 import ap_connector_bundle as bundle
 import run_bizhawk_connector_probe as probe
 from run_bizhawk_probe import prepare_runtime
+from rom_identity import CodeReference
 
 
 RESPONSES = [
@@ -142,6 +143,85 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(api.connections, 2)
         self.assertEqual(len(exchanges), 2)
         self.assertEqual(api.asserted_requests, list(probe.REQUESTS))
+
+    def test_mismatched_code_read_fails_and_records_attempt(self):
+        class Context:
+            streams = None
+            _port = 43055
+
+        class API:
+            BizHawkContext = Context
+
+            async def connect(self, context):
+                return True
+
+            async def get_script_version(self, context):
+                return 1
+
+            async def send_requests(self, context, requests):
+                return copy.deepcopy(RESPONSES)
+
+            async def read(self, context, requests):
+                return [b"\0" * 64]
+
+            def disconnect(self, context):
+                pass
+
+        class Process:
+            def poll(self):
+                return None
+
+        audit = {"memory_read_requests": 0}
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            asyncio.run(probe.exercise_connector(
+                API(), Process(), 1, CodeReference(0x100000, bytes(range(64))), audit
+            ))
+        self.assertEqual(audit["memory_read_requests"], 1)
+
+    def test_matching_code_is_read_only_and_rechecked_after_reconnect(self):
+        expected = bytes(range(64))
+        reads = []
+
+        class Writer:
+            async def wait_closed(self):
+                pass
+
+        class Context:
+            streams = None
+            _port = 43055
+
+        class API:
+            BizHawkContext = Context
+
+            async def connect(self, context):
+                context.streams = (None, Writer())
+                return True
+
+            async def get_script_version(self, context):
+                return 1
+
+            async def send_requests(self, context, requests):
+                return copy.deepcopy(RESPONSES)
+
+            async def read(self, context, requests):
+                reads.append(requests)
+                return [expected]
+
+            def disconnect(self, context):
+                context.streams = None
+
+        class Process:
+            def poll(self):
+                return None
+
+        audit = {"memory_read_requests": 0}
+        exchanges = asyncio.run(probe.exercise_connector(
+            API(), Process(), 1, CodeReference(0x100000, expected), audit
+        ))
+        self.assertEqual(audit["memory_read_requests"], 2)
+        self.assertEqual(reads, [[(0x100000, 64, "System Bus")]] * 2)
+        self.assertTrue(all(exchange["code_read"]["matches_rom_prefix"] for exchange in exchanges))
+        self.assertNotIn("expected", json.dumps(exchanges))
 
 
 if __name__ == "__main__":
