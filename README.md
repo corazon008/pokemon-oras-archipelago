@@ -28,7 +28,8 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
   observé avec témoins négatifs, sauvegarde et rechargement. Suite manuelle
   3 → 4 et lecture API AP après reconnexion validées, pas sa permanence globale.
 - OR : checkpoint avant Pokédex préservé ; candidat 2722 faux dans le fichier
-  et via le pont AP. Réception native et témoin positif encore nécessaires.
+  et via le pont AP, puis vrai après réception native, sauvegarde et redémarrage.
+  Interface Pokédex fonctionnelle et relecture AP après reconnexion vérifiées.
 - Aucun flag de location, ID Archipelago ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
 - Profil interactif isolé disponible ; sauvegarde OR jouable reçue et préservée.
@@ -50,12 +51,13 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Contournement clavier d'une entrée bloquée — rapport 010](docs/reports/010-keyboard-input-workaround.md).
 - [Suite manuelle et lecture d'événement via AP — rapport 011](docs/reports/011-clock-event-follow-up-and-ap-read.md).
 - [Témoin avant réception du Pokédex — rapport 012](docs/reports/012-pokedex-before-checkpoint.md).
+- [Réception du Pokédex et persistance — rapport 013](docs/reports/013-pokedex-event-and-persistence.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Établir un indicateur de progression permanent au-delà des états déjà observés.
-Prochain essai : réception du Pokédex, comparaison avant/après et rechargement.
+Développer `GameInterface` et le protocole de livraison persistant/dédoublonné,
+puis une boucle serveur minimale avec le candidat Pokédex et un consommable.
 La boucle serveur et la livraison idempotente restent à développer ; l'essai
 de quantité ne les remplace pas.
 

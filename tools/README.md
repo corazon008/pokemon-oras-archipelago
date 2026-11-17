@@ -338,8 +338,14 @@ Les bindings clavier sont conservés.
 
 Code, inventaire et EventWork sont relus avant/après reconnexion. Ce diagnostic
 exige encore un inventaire non nul. Le fichier `main` entier doit rester inchangé.
-Les états du candidat non observés sont **inconnus**, jamais déduits d'un seuil.
+Les états du candidat horloge non observés sont **inconnus**, jamais déduits d'un seuil.
 Ce n'est pas un check de location ni un client AP.
+
+La réponse `event_read.pokedex` expose aussi le flag décimal 2722, après
+comparaison du bloc complet à la sauvegarde CRC-valide. Sa transition native
+faux → vrai, son rechargement et l'interface fonctionnelle sont documentés dans
+le [rapport 013](../docs/reports/013-pokedex-event-and-persistence.md).
+`production_location_approved` reste faux : aucun check n'est envoyé.
 
 `--session` et `--seed-save` sont exclusifs. L'écriture expérimentale exige
 toujours une nouvelle copie depuis `--seed-save`, sans `--read-event-work`.

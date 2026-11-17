@@ -1,4 +1,4 @@
-"""Read-only AP transport probe for the experimentally observed OR clock-scene candidate."""
+"""Read-only AP transport probes for build-specific OR event observations."""
 
 from dataclasses import dataclass
 import hashlib
@@ -35,7 +35,10 @@ def clock_scene_observation(block: bytes, rom_hash: str) -> dict:
 
 
 def pokedex_observation(block: bytes, rom_hash: str) -> dict:
-    """PKHeX flags_oras_en.txt labels flag 2722; native transition still required."""
+    """Flag 2722: native false-to-true transition and cold reload verified on this OR build.
+
+    This observation is not an approved production location or a server check.
+    """
     if rom_hash != OR_ROM_SHA256:
         raise ValueError("Pokedex candidate requires the verified OR build")
     return {

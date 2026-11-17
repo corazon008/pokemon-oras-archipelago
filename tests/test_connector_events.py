@@ -36,6 +36,8 @@ class EventTransportTests(unittest.TestCase):
         self.assertTrue(result["value"])
         self.assertEqual(result["flag_index_decimal"], 2722)
         self.assertFalse(result["production_location_approved"])
+        block[FLAG_OFFSET + 2722 // 8] &= ~(1 << (2722 % 8))
+        self.assertFalse(pokedex_observation(block, OR_ROM_SHA256)["value"])
 
     def test_pokedex_candidate_rejects_unknown_build_and_bad_length(self):
         with self.assertRaisesRegex(ValueError, "verified OR"):
@@ -96,6 +98,21 @@ class EventTransportTests(unittest.TestCase):
                 API(clock_block(5)), None, EventReference(0x08C7DAEC, clock_block(4), OR_ROM_SHA256), audit,
             ))
         self.assertEqual(audit["memory_read_requests"], 1)
+
+    def test_positive_pokedex_bit_rechecked_after_reconnect_without_writes(self):
+        data = bytearray(clock_block(4))
+        data[FLAG_OFFSET + 2722 // 8] |= 1 << (2722 % 8)
+        reference = EventReference(0x08C7DAEC, bytes(data), OR_ROM_SHA256)
+        audit = {"memory_read_requests": 0, "memory_write_requests": 0}
+        exchanges = asyncio.run(exercise_connector(
+            API(bytes(data)), Process(), 1, CodeReference(0x100000, bytes(range(64))), audit,
+            event_reference=reference,
+        ))
+        self.assertEqual(len(exchanges), 2)
+        for exchange in exchanges:
+            self.assertIs(exchange["event_read"]["pokedex"]["value"], True)
+            self.assertFalse(exchange["event_read"]["pokedex"]["production_location_approved"])
+        self.assertEqual(audit["memory_write_requests"], 0)
 
     def test_event_observations_require_code_guard(self):
         api = API(clock_block(4))

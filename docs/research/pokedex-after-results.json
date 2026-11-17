@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "manual_session": "/tmp/opencode/oras-save-ev5_8vq1/attempt-4pje26wu",
+  "before_checkpoint": "/tmp/opencode/oras-save-ev5_8vq1/checkpoints/before-pokedex-koagt8zq",
+  "after_checkpoint": "/tmp/opencode/oras-save-ev5_8vq1/checkpoints/after-pokedex-n7rbztpv",
+  "before_save_sha256": "3b4e66edc55fbc46e0cab2e10d287f40d9082232e0a67cc244efc96f650a2bff",
+  "after_save_sha256": "deec5f94d522504fdad98c432fb7364ea874e5b63bf3746b70923ee2e6cbd8fa",
+  "valid_crc_blocks_before_and_after": 58,
+  "after_event_block_sha256": "ea1f88b12e055845a6c91f3eb1cd2f73a1a4ca941dcee3f35d87e529090f4249",
+  "event": {
+    "name": "Pokedex Obtained",
+    "flag_index_decimal": 2722,
+    "before": false,
+    "after": true,
+    "event_block_address": "0x08C7DAEC",
+    "byte_offset_in_block": "0x444",
+    "observed_byte_address": "0x08C7DF30",
+    "mask": "0x04",
+    "before_byte": "0x00",
+    "after_byte": "0x04",
+    "other_bits_in_same_byte_unchanged": true
+  },
+  "other_changes_in_manual_session": {
+    "work_changes": [
+      {"index": 16, "before": 6, "after": 0},
+      {"index": 17, "before": 2, "after": 0},
+      {"index": 112, "before": 4, "after": 5},
+      {"index": 117, "before": 2, "after": 4},
+      {"index": 124, "before": 1, "after": 2},
+      {"index": 125, "before": 1, "after": 2}
+    ],
+    "flag_changes_except_target": [
+      {"index": 208, "before": false, "after": true},
+      {"index": 601, "before": true, "after": false},
+      {"index": 619, "before": false, "after": true}
+    ],
+    "unknown_tail_changed_offsets": [],
+    "exact_intermediate_actions_recorded": false
+  },
+  "ap_cold_reload": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/connector-attempt-je4_owev",
+    "boot_capture": "boot/step-07.png",
+    "observed_position": "Birch's lab with Birch and rival",
+    "values_each_connection": [true, true],
+    "memory_read_requests": 6,
+    "memory_write_requests": 0,
+    "full_event_block_matches_crc_validated_save": true,
+    "save_unchanged": true,
+    "exit_code": 0
+  },
+  "native_ui_reload": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/attempt-gm5aztuu",
+    "capture": "step-13.png",
+    "observed_functional_pokedex": true,
+    "ui_caught_count": 1,
+    "ui_seen_count": 4,
+    "memory_read_requests": 2,
+    "memory_write_requests": 0,
+    "full_event_block_matches_crc_validated_save": true,
+    "save_unchanged": true,
+    "exit_code": 0
+  },
+  "source_original_sha256_unchanged": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+  "savestate_used": false,
+  "production_location_approved": false,
+  "server_location_check_sent": false,
+  "ap_item_delivery_validated": false,
+  "alpha_sapphire_event_validated": false
+}
