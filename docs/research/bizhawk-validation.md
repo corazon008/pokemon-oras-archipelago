@@ -10,6 +10,9 @@ Cela ne suffit pas à valider BH-05 ou BH-09 dans leur totalité.
 Le [rapport 004](../reports/004-rom-identity-and-read.md) démontre une lecture
 de code comparée à la ROM sur chaque édition. Ce n'est pas encore la lecture
 d'une variable de progression exigée par BH-04.
+Le [rapport 005](../reports/005-private-save-profile.md) prépare le profil privé.
+Le candidat `main` existant n'étant pas reconnu, une sauvegarde native jouable
+reste nécessaire avant les tests de progression.
 
 ## Conditions préalables
 

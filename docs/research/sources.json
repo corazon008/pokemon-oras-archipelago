@@ -12,7 +12,10 @@
         "src/core/file_sys/ncch_container.h",
         "src/core/file_sys/ncch_container.cpp",
         "src/core/loader/ncch.h",
-        "src/core/loader/ncch.cpp"
+        "src/core/loader/ncch.cpp",
+        "src/core/file_sys/archive_source_sd_savedata.cpp",
+        "src/core/file_sys/archive_savedata.cpp",
+        "src/core/file_sys/savedata_archive.cpp"
       ],
       "note": "Container metadata and text mapping; no offsets inferred from filenames."
     },
@@ -53,6 +56,9 @@
         "src/BizHawk.Emulation.Cores/Consoles/Nintendo/3DS/Encore.IEmulator.cs",
         "src/BizHawk.Client.Common/ArgParser.cs",
         "src/BizHawk.Client.Common/lua/CommonLibs/ClientLuaLibrary.cs",
+        "src/BizHawk.Client.Common/lua/CommonLibs/JoypadLuaLibrary.cs",
+        "src/BizHawk.Emulation.Cores/Consoles/Nintendo/3DS/Encore.IInputPollable.cs",
+        "src/BizHawk.Emulation.Cores/Consoles/Nintendo/3DS/Encore.cs",
         "src/BizHawk.Client.Common/lua/CommonLibs/MemoryLuaLibrary.cs",
         "src/BizHawk.Client.Common/Api/Classes/MemoryApi.cs"
       ]
@@ -141,7 +147,8 @@
         "PKHeX.Core/Saves/SAV6AO.cs",
         "PKHeX.Core/Saves/Access/SaveBlockAccessor6AO.cs",
         "PKHeX.Core/Saves/Substructures/Gen6/EventWork6.cs",
-        "PKHeX.Core/Saves/Substructures/Gen6/MyItem6AO.cs"
+        "PKHeX.Core/Saves/Substructures/Gen6/MyItem6AO.cs",
+        "PKHeX.Core/Saves/Util/SaveUtil.cs"
       ],
       "note": "Decrypted save-file layout is not a runtime RAM address map."
     }

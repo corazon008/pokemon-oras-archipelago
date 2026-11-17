@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "scope": "Isolated save-copy and native UI preparation; playable save not validated",
+  "program_id": "000400000011C400",
+  "source_main_size_bytes": 483328,
+  "source_main_recognized_footer_present": false,
+  "source_main_unchanged": true,
+  "source_archive_metadata_unchanged": true,
+  "retained_session": "/tmp/opencode/oras-save-ozy__rwc",
+  "retained_attempt": "/tmp/opencode/oras-save-ozy__rwc/attempt-71v7x959",
+  "archive_metadata_included_in_retained_copy": true,
+  "observed_screens": [
+    "Language selection",
+    "Confirm language / Begin game"
+  ],
+  "process_exit_code": 0,
+  "native_input_frames_requested": 1202,
+  "direct_memory_read_requests": 0,
+  "direct_memory_write_requests": 0,
+  "playable_save_loaded": false,
+  "native_save_reload_cycle_validated": false,
+  "final_tool_rejects_unrecognized_new_seed_imports": true,
+  "interactive_mode_executed": false
+}

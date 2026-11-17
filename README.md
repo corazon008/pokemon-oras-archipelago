@@ -21,6 +21,7 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - Partie jouable, sauvegarde et lecture/écriture d'une variable encore non validées.
 - Aucun offset de progression, flag de location, item ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
+- Profil interactif isolé disponible ; sauvegarde jouable encore nécessaire.
 
 ## Documents
 
@@ -31,12 +32,14 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Premiers essais BizHawk — rapport 002](docs/reports/002-bizhawk-capabilities.md).
 - [Connecteur TCP — rapport 003](docs/reports/003-bizhawk-tcp.md).
 - [Identité ROM et lecture mémoire — rapport 004](docs/reports/004-rom-identity-and-read.md).
+- [Profil privé de sauvegarde — rapport 005](docs/reports/005-private-save-profile.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Identifier les builds exacts, préparer une sauvegarde de test jouable et
-vérifier la lecture d'une variable identifiée. Écriture
+Créer une sauvegarde de test jouable dans le
+[profil interactif isolé](tools/README.md#créer-une-sauvegarde-jouable-dans-un-profil-privé),
+puis vérifier la lecture d'une variable identifiée. Écriture
 contrôlée et persistance viendront ensuite. Le développement du prototype
 Archipelago vient après ces preuves, pas à leur place.
 

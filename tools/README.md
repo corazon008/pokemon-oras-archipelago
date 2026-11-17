@@ -121,3 +121,52 @@ Les octets ne sont pas enregistrés dans les résultats JSON.
 Cette option ne lit aucune variable de progression et n'envoie aucune écriture.
 Le mode sans `--read-code` reste limité aux métadonnées.
 Voir le [rapport 004](../docs/reports/004-rom-identity-and-read.md).
+
+## Créer une sauvegarde jouable dans un profil privé
+
+```sh
+python3 tools/run_bizhawk_save_probe.py --interactive \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+```
+
+Cette commande ouvre une **nouvelle copie isolée** de BizHawk. Créer une partie,
+atteindre un état jouable, sauvegarder depuis le menu natif et fermer proprement
+l'émulateur. Ne pas remplacer un fichier du répertoire `bin/` ou la ROM originale.
+
+Le terminal indique le dossier `/tmp/opencode/oras-save-*`. Le conserver pour
+les essais suivants : il contient le profil et sa sauvegarde de test.
+Le mode interactif n'a ni macro, ni fermeture automatique après délai.
+Une fermeture réussie de la fenêtre ne prouve pas à elle seule qu'une sauvegarde
+a été effectuée ; ce point devra être vérifié au rechargement.
+
+Pour reprendre ce même profil :
+
+```sh
+python3 tools/run_bizhawk_save_probe.py --interactive \
+  --session /tmp/opencode/oras-save-IDENTIFIANT \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+```
+
+Les profils `/tmp` sont temporaires : ils peuvent disparaître après redémarrage
+ou nettoyage du système. Conserver une copie privée avant un essai important.
+
+Le mode automatisé, sans `--interactive`, accepte par exemple :
+
+```text
+--steps "180:-,2:A,120:-"
+```
+
+Cela signifie attendre 180 frames, appuyer sur A pendant deux frames, puis
+attendre 120 frames. Chaque étape produit une capture privée. Seuls les boutons
+ordinaires sont autorisés ; pas de Reset, toucher ou code Lua arbitraire.
+
+`--seed-save` peut importer une copie d'un `main` reconnu par taille et marqueur
+ORAS. Son fichier Encore `00000001.metadata` de 16 octets doit être présent à
+côté du dossier `00000001/`. Aucun déchiffrement ou conversion n'est tenté.
+Ce contrôle ne remplace pas une validation complète des CRC ni un chargement
+effectif par le jeu. `--seed-save` et `--session` sont incompatibles pour éviter
+de réinitialiser une sauvegarde de travail.
+
+Le candidat trouvé lors de la recherche initiale n'a pas le marqueur attendu ;
+il est refusé par le contrôle final. Voir le
+[rapport 005](../docs/reports/005-private-save-profile.md).
