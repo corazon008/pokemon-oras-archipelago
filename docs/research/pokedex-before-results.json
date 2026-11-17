@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "profile": "/tmp/opencode/oras-save-ev5_8vq1",
+  "checkpoint": "/tmp/opencode/oras-save-ev5_8vq1/checkpoints/before-pokedex-koagt8zq",
+  "checkpoint_main_relative_path": "00000001/main",
+  "checkpoint_metadata_relative_path": "00000001.metadata",
+  "save_sha256": "3b4e66edc55fbc46e0cab2e10d287f40d9082232e0a67cc244efc96f650a2bff",
+  "archive_metadata_sha256": "24bb7e7f2835b4a0306d8ef31cb0ff1a37776ee7e8a591efe71e1046c78c4499",
+  "validated_crc_blocks": 58,
+  "event_block_sha256": "906d1070714746c9563861e6d7999f021e4be72aaa7667f3d62ead63d4604c5d",
+  "candidate": {
+    "name": "Pokedex Obtained",
+    "source": "kwsch/PKHeX@6c9583883c7551ac74a4b74180cead249d4277b8/PKHeX.Core/Resources/text/script/gen6/flags_oras_en.txt",
+    "flag_index_decimal": 2722,
+    "value_before": false,
+    "production_location_approved": false
+  },
+  "user_report": "Starter obtained and rival defeated; saved before returning to Birch's lab",
+  "cold_reload_ui": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/connector-attempt-a63bs3x1",
+    "capture": "boot/step-07.png",
+    "observed_location": "Route 103",
+    "battle_outcome_independently_validated": false
+  },
+  "ap_connector_read": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/connector-attempt-a63bs3x1",
+    "values_each_connection": [false, false],
+    "full_event_block_matches_validated_save": true,
+    "memory_read_requests": 6,
+    "memory_write_requests": 0,
+    "save_unchanged": true,
+    "exit_code": 0
+  },
+  "source_original_sha256_unchanged": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+  "native_false_to_true_transition_validated": false,
+  "post_event_reload_validated": false,
+  "server_location_check_sent": false
+}

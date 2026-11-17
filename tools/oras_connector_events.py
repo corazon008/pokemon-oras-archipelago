@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
-from oras_events import EVENT_LENGTH, event_bytes, event_work
+from oras_events import EVENT_LENGTH, event_bytes, event_flag, event_work
 
 
 OR_ROM_SHA256 = "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4"
@@ -30,6 +30,18 @@ def clock_scene_observation(block: bytes, rom_hash: str) -> dict:
         "work_index_decimal": 130, "value": value,
         "completed_in_observed_states": completed,
         "state": "unknown" if completed is None else "observed_complete" if completed else "observed_incomplete",
+        "production_location_approved": False,
+    }
+
+
+def pokedex_observation(block: bytes, rom_hash: str) -> dict:
+    """PKHeX flags_oras_en.txt labels flag 2722; native transition still required."""
+    if rom_hash != OR_ROM_SHA256:
+        raise ValueError("Pokedex candidate requires the verified OR build")
+    return {
+        "candidate": "pokedex_obtained",
+        "flag_index_decimal": 2722,
+        "value": event_flag(block, 2722),
         "production_location_approved": False,
     }
 
@@ -59,4 +71,5 @@ async def read_events(api, context, reference: EventReference, audit: dict) -> d
         "domain": "System Bus", "address": f"0x{reference.address:08X}", "length": EVENT_LENGTH,
         "sha256": hashlib.sha256(payloads[0]).hexdigest(), "matches_validated_save": True,
         "clock_scene": clock_scene_observation(payloads[0], reference.rom_hash),
+        "pokedex": pokedex_observation(payloads[0], reference.rom_hash),
     }

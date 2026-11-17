@@ -10,9 +10,9 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from oras_connector_events import (
-    OR_ROM_SHA256, EventReference, clock_scene_observation, load_event_reference, read_events,
+    OR_ROM_SHA256, EventReference, clock_scene_observation, load_event_reference, pokedex_observation, read_events,
 )
-from oras_events import EVENT_LENGTH
+from oras_events import EVENT_LENGTH, FLAG_OFFSET
 from rom_identity import CodeReference
 from run_bizhawk_connector_probe import exercise_connector, reuse_profile
 from run_bizhawk_save_probe import keyboard_only_config
@@ -27,6 +27,22 @@ def clock_block(value):
 
 
 class EventTransportTests(unittest.TestCase):
+    def test_pokedex_candidate_uses_documented_bit_without_approval(self):
+        block = bytearray(EVENT_LENGTH)
+        block[FLAG_OFFSET + 2722 // 8] = 1 << 1  # Neighboring bit is not this event.
+        self.assertFalse(pokedex_observation(block, OR_ROM_SHA256)["value"])
+        block[FLAG_OFFSET + 2722 // 8] |= 1 << (2722 % 8)
+        result = pokedex_observation(block, OR_ROM_SHA256)
+        self.assertTrue(result["value"])
+        self.assertEqual(result["flag_index_decimal"], 2722)
+        self.assertFalse(result["production_location_approved"])
+
+    def test_pokedex_candidate_rejects_unknown_build_and_bad_length(self):
+        with self.assertRaisesRegex(ValueError, "verified OR"):
+            pokedex_observation(bytes(EVENT_LENGTH), "0" * 64)
+        with self.assertRaisesRegex(ValueError, "length"):
+            pokedex_observation(bytes(EVENT_LENGTH - 1), OR_ROM_SHA256)
+
     def test_only_observed_states_are_classified(self):
         for value, completed in ((2, False), (3, True), (4, True), (0, None), (1, None), (5, None), (65535, None)):
             result = clock_scene_observation(clock_block(value), OR_ROM_SHA256)
@@ -70,6 +86,8 @@ class EventTransportTests(unittest.TestCase):
         self.assertEqual(audit["memory_write_requests"], 0)
         self.assertEqual(api.reads[1::2], [[(0x08C7DAEC, EVENT_LENGTH, "System Bus")]] * 2)
         self.assertTrue(all(exchange["event_read"]["clock_scene"]["completed_in_observed_states"] for exchange in exchanges))
+        self.assertTrue(all(exchange["event_read"]["pokedex"]["value"] is False for exchange in exchanges))
+        self.assertTrue(all(exchange["event_read"]["pokedex"]["flag_index_decimal"] == 2722 for exchange in exchanges))
 
     def test_event_mismatch_fails_and_counts_attempt(self):
         audit = {"memory_read_requests": 0}
