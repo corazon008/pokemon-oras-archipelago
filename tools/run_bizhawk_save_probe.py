@@ -11,7 +11,7 @@ import subprocess
 import tempfile
 
 from rom_identity import inspect_rom, sha256_file
-from oras_save import validate_save, inventory_bytes, inventory_entries
+from oras_save import validate_save, inventory_bytes, inventory_entries, compare_medicine_change
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
@@ -85,6 +85,8 @@ def main() -> int:
         "--scan-inventory", action="store_true",
         help="Search the documented application heap for this validated save's inventory",
     )
+    parser.add_argument("--sample-step", type=int, help="Read inventory once more after this native UI step")
+    parser.add_argument("--expect-medicine", help="Verify a native quantity change, e.g. 17:0; no game writes")
     args = parser.parse_args()
     try:
         steps = parse_steps(args.steps)
@@ -100,6 +102,20 @@ def main() -> int:
         parser.error("Interactive mode does not support memory observation or speed overrides")
     if not 1 <= args.speed <= 1000:
         parser.error("Speed must be between 1 and 1000 percent")
+    if args.sample_step is not None and (
+        not args.read_inventory or not 1 <= args.sample_step < len(steps)
+    ):
+        parser.error("--sample-step requires --read-inventory and an intermediate UI step")
+    expected_medicine = None
+    if args.expect_medicine is not None:
+        try:
+            expected_medicine = tuple(int(value) for value in args.expect_medicine.split(":"))
+            if len(expected_medicine) != 2 or not 1 <= expected_medicine[0] <= 65535 or not 0 <= expected_medicine[1] <= 999:
+                raise ValueError
+        except ValueError:
+            parser.error("--expect-medicine must be item_id:quantity within valid integer bounds")
+        if args.sample_step is None:
+            parser.error("--expect-medicine requires --sample-step")
     if args.seed_save:
         try:
             validate_save_container(args.seed_save)
@@ -183,6 +199,8 @@ def main() -> int:
             "ORAS_INVENTORY_ADDRESS": str(int(candidate["inventory_address"], 16)),
             "ORAS_INVENTORY_LENGTH": str(candidate["inventory_length"]),
         })
+        if args.sample_step is not None:
+            env["ORAS_INVENTORY_SAMPLE_STEP"] = str(args.sample_step)
         if args.scan_inventory:
             reference_path = attempt / "inventory-reference.bin"
             reference_path.write_bytes(reference)
@@ -231,7 +249,11 @@ def main() -> int:
     report["native_save_sha256"] = sha256(target) if target.exists() else None
     if args.read_inventory:
         report["scope"] = "Native UI and one explicit read-only inventory candidate"
-        report["memory_read_requests"] = int((attempt / "inventory-requested").exists())
+        journal = attempt / "inventory-read-requests.txt"
+        report["memory_read_requests"] = (
+            len(journal.read_text().splitlines()) if journal.exists()
+            else int((attempt / "inventory-requested").exists())
+        )
         observed_path = attempt / "inventory-read.bin"
         matches = observed_path.exists() and observed_path.read_bytes() == reference
         report["inventory_read"] = {
@@ -241,7 +263,20 @@ def main() -> int:
             "matches_validated_save": matches,
             "reference_entries": inventory_entries(reference),
         }
-        report["complete"] = report["complete"] and matches
+        if expected_medicine is not None:
+            report["scope"] = "Native medicine change with read-only before/after observations"
+            report["expected_change_comparison_only"] = True
+            before_path = attempt / "inventory-before.bin"
+            if before_path.exists() and observed_path.exists():
+                differential = compare_medicine_change(
+                    reference, before_path.read_bytes(), observed_path.read_bytes(), *expected_medicine
+                )
+                report["inventory_read"]["differential"] = differential
+                report["complete"] = report["complete"] and differential["passed"]
+            else:
+                report["complete"] = False
+        else:
+            report["complete"] = report["complete"] and matches
     if args.scan_inventory:
         report["scope"] = "Read-only exact inventory search in Encore's documented application heap"
         journal = attempt / "inventory-scan-reads.txt"

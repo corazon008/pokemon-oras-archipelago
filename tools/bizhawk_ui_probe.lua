@@ -37,6 +37,7 @@ for index, step in ipairs(steps) do
     end
     client.screenshot(string.format("%s/step-%02d.png", capture, index))
     print(string.format("ORAS_UI_STEP %d frames=%d buttons=%s", index, step.count, step.names))
+    if type(ORAS_UI_AFTER_STEP) == "function" then ORAS_UI_AFTER_STEP(index) end
 end
 local complete = assert(io.open(capture .. "/complete", "w"))
 complete:write(tostring(emu.framecount()), "\n")

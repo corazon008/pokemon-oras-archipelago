@@ -25,7 +25,8 @@
         "/tmp/opencode/oras-save-1dqaca6j/attempt-yx5y37qg",
         "/tmp/opencode/oras-save-1dqaca6j/attempt-_jian3iq"
       ],
-      "status": "Exact static matches in two clean runs; native differential validation still required."
+      "native_differential_observation": "/tmp/opencode/oras-save-1dqaca6j/attempt-_ovw_882",
+      "status": "Read-only Potion quantity validated through native 1-to-0 change; writes remain unvalidated."
     }
   }
 }

@@ -205,3 +205,19 @@ Le lanceur désactive HIDAPI dans les processus automatisés seulement, pour
 contourner une exception SDL observée à la fermeture. Les entrées physiques
 des sessions interactives ne sont pas modifiées.
 Voir le [rapport 006](../docs/reports/006-native-reload-and-inventory.md).
+
+## Observer une variation native
+
+Avec `--read-inventory`, `--sample-step N` ajoute une lecture après l'étape N,
+puis une seconde à la fin. La première doit correspondre au fichier validé.
+La comparaison `--expect-medicine 17:0` vérifie ensuite une quantité de Potion
+devenue nulle par **action native**. Elle n'écrit rien dans le jeu.
+
+Cette option exige une étape intermédiaire et refuse une variation d'autres
+objets ou d'autres poches. Les journaux comptent les lectures même si elles
+échouent. Captures binaires d'inventaire et captures d'écran restent privées.
+
+Les macros sont dépendantes du contexte UI. Une macro terminée ou une
+variation RAM réussie ne prouve pas une sauvegarde : vérifier le message natif,
+le fichier, ses CRC puis un redémarrage. Les preuves observées sont dans le
+[rapport 007](../docs/reports/007-native-quantity-and-persistence.md).

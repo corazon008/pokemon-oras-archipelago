@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "program_id": "000400000011C400",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "source_session": "/tmp/opencode/oras-save-utuw0b7e",
+  "source_save_sha256_unchanged": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+  "source_potion_quantity": 1,
+  "working_session": "/tmp/opencode/oras-save-1dqaca6j",
+  "inventory_address": "0x08C6AC80",
+  "quantity_field_address": "0x08C6B5F2",
+  "quantity_field_type": "little-endian uint16",
+  "item_id": 17,
+  "pouch": "medicine",
+  "slot": 0,
+  "native_action": "Discard one Potion using the Bag menu",
+  "before_quantity": 1,
+  "after_quantity": 0,
+  "differential": {
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-o64c6_lu",
+    "baseline_matches_validated_save": true,
+    "non_target_items_unchanged": true,
+    "outside_medicine_bytes_unchanged": true,
+    "memory_read_operations": 2,
+    "direct_memory_write_operations": 0,
+    "exit_code": 0
+  },
+  "unsuccessful_save_macro": {
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-vlukzwyj",
+    "native_quantity_change_succeeded": true,
+    "native_save_hash_changed": false,
+    "persistence_claimed": false,
+    "cause_observed": "X closed the parent menu after leaving the Bag."
+  },
+  "native_save": {
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-_ovw_882",
+    "save_sha256": "839cd0baa0cb631ecc07174841081769b1140cca352e24f7fb0c39250b60e8f7",
+    "inventory_sha256": "1c5e0cbf7e9ed7bf9747a54545b5b425cee38700dbada1f5a023a04ae117bcb1",
+    "valid_crc_blocks": 58,
+    "potion_quantity": 0,
+    "observed_native_saved_message": true,
+    "exit_code": 0
+  },
+  "cold_reload": {
+    "evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-40e675i6",
+    "medicine_pouch_observed_empty": true,
+    "save_hash_unchanged": true,
+    "savestate_used": false,
+    "exit_code": 0
+  },
+  "remote_item_delivery_validated": false,
+  "direct_memory_write_validated": false
+}

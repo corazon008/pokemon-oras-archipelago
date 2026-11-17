@@ -70,6 +70,46 @@ class SaveProbeTests(unittest.TestCase):
 
 @unittest.skipUnless(LUA, "Lua is not installed")
 class NativeInputTests(unittest.TestCase):
+    def test_inventory_observer_samples_before_and_after_without_writes(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            root = Path(directory)
+            (root / "steps.txt").write_text("3:-\n2:A\n")
+            fixture = """
+local reads, frames = 0, 0
+joypad = {get=function() return {A=false} end, set=function() end}
+emu = {frameadvance=function() frames=frames+1 end, framecount=function() return frames end}
+client = {screenshot=function() end, exit=function() assert(reads == 2) end}
+memory = setmetatable({
+    read_bytes_as_array=function(address, length, domain)
+        assert(address == 0x08C6AC80 and length == 0xB90 and domain == "System Bus")
+        reads = reads + 1
+        local bytes = {}
+        for i=1,length do bytes[i]=0 end
+        if reads == 1 then bytes[0x971]=17; bytes[0x973]=1 end
+        return bytes
+    end,
+}, {__index=function() error("Unexpected memory API") end})
+"""
+            env = os.environ.copy()
+            env.update({
+                "ORAS_UI_PLAN": str(root / "steps.txt"),
+                "ORAS_UI_CAPTURE": str(root),
+                "ORAS_UI_SCRIPT": str(ROOT / "tools/bizhawk_ui_probe.lua"),
+                "ORAS_UI_CONTINUE": "1", "ORAS_UI_SPEED": "100",
+                "ORAS_INVENTORY_ADDRESS": str(0x08C6AC80),
+                "ORAS_INVENTORY_LENGTH": str(0xB90),
+                "ORAS_INVENTORY_SAMPLE_STEP": "1",
+            })
+            result = subprocess.run(
+                [LUA, "-"], input=fixture + "\ndofile(" + repr(str(ROOT / "tools/bizhawk_inventory_probe.lua")) + ")",
+                env=env, text=True, capture_output=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual((root / "inventory-before.bin").read_bytes()[0x970], 17)
+            self.assertEqual((root / "inventory-read.bin").read_bytes(), bytes(0xB90))
+            self.assertEqual((root / "inventory-read-requests.txt").read_text().splitlines(),
+                             ["inventory-before", "inventory-read"])
+
     def run_fixture(self, plan):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             root = Path(directory)

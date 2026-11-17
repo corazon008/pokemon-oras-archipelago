@@ -6,6 +6,7 @@ File offsets below are not runtime RAM addresses.
 """
 
 import argparse
+from collections import Counter
 import binascii
 import hashlib
 import json
@@ -93,6 +94,45 @@ def inspect_save(data: bytes) -> dict:
         "inventory": inventory_entries(inventory),
         "money": struct.unpack_from("<I", data, BLOCKS[11][0] + 8)[0],
     }
+
+
+def compare_medicine_change(reference: bytes, before: bytes, after: bytes,
+                            item_id: int, expected_quantity: int) -> dict:
+    """Verify one native medicine-quantity change without creating game-write data."""
+    old_entries = inventory_entries(reference)
+    inventory_entries(before)  # Validate the baseline buffer length too.
+    new_entries = inventory_entries(after)
+    target = ("medicine", item_id)
+
+    def totals(entries):
+        values = Counter()
+        for entry in entries:
+            values[(entry["pouch"], entry["item_id"])] += entry["quantity"]
+        return {key: value for key, value in values.items() if value}
+
+    old_totals, new_totals = totals(old_entries), totals(new_entries)
+    old_quantity = old_totals.pop(target, 0)
+    new_quantity = new_totals.pop(target, 0)
+    outside_medicine_unchanged = before[:0x970] == after[:0x970] and before[0xA70:] == after[0xA70:]
+    result = {
+        "before_matches_validated_save": before == reference,
+        "item_id": item_id,
+        "before_quantity": old_quantity,
+        "observed_quantity": new_quantity,
+        "expected_quantity": expected_quantity,
+        "non_target_items_unchanged": old_totals == new_totals,
+        "outside_medicine_bytes_unchanged": outside_medicine_unchanged,
+    }
+    result["passed"] = (
+        result["before_matches_validated_save"]
+        and 0 < old_quantity <= 999
+        and 0 <= expected_quantity <= 999
+        and expected_quantity != old_quantity
+        and new_quantity == expected_quantity
+        and result["non_target_items_unchanged"]
+        and outside_medicine_unchanged
+    )
+    return result
 
 
 def main() -> int:

@@ -1,21 +1,24 @@
 # Validation expérimentale BizHawk / Encore
 
-Statut au 17 novembre 2026 : **menu de langue atteint sur les deux jeux et
-inventaire Lua validé**. Gameplay, sauvegarde et accès à une variable non validés.
-Voir le [rapport 002](../reports/002-bizhawk-capabilities.md) et les
-[mesures](bizhawk-results.json).
-Le [rapport 003](../reports/003-bizhawk-tcp.md) valide en plus le transport TCP
-et une déconnexion/reconnexion sur les deux éditions, en métadonnées seulement.
-Cela ne suffit pas à valider BH-05 ou BH-09 dans leur totalité.
-Le [rapport 004](../reports/004-rom-identity-and-read.md) démontre une lecture
-de code comparée à la ROM sur chaque édition. Ce n'est pas encore la lecture
-d'une variable de progression exigée par BH-04.
-Le [rapport 005](../reports/005-private-save-profile.md) prépare le profil privé.
-Le candidat `main` existant n'étant pas reconnu, une sauvegarde native jouable
-reste nécessaire avant les tests de progression.
-Le [rapport 006](../reports/006-native-reload-and-inventory.md) valide désormais
-le rechargement natif OR et une concordance statique inventaire sauvegarde/RAM/UI.
-La variation de quantité et l'application distante restent à tester.
+Statut au 17 novembre 2026 :
+
+- Deux éditions : menu, domaines Lua, transport TCP et lecture de code vérifiés.
+- OR : partie native rechargée, lecture de quantité corrélée au sac,
+  variation Potion 1 → 0 et persistance native vérifiées.
+- AS : aucune sauvegarde jouable ni variable de progression encore validée.
+- Inventaire via le pont AP, écriture distante et boucle serveur : non validés.
+
+Historique des preuves :
+
+- [002 — capacités](../reports/002-bizhawk-capabilities.md) et [mesures](bizhawk-results.json).
+- [003 — TCP](../reports/003-bizhawk-tcp.md).
+- [004 — lecture de code](../reports/004-rom-identity-and-read.md).
+- [005 — préparation du profil](../reports/005-private-save-profile.md).
+- [006 — rechargement et inventaire statique](../reports/006-native-reload-and-inventory.md).
+- [007 — variation et persistance natives](../reports/007-native-quantity-and-persistence.md).
+
+Une reconnexion de métadonnées ne suffit pas à valider la reprise des items
+ou des pointeurs exigée par BH-09.
 
 ## Conditions préalables
 
@@ -136,7 +139,7 @@ La matrice reste indépendante :
 
 | Configuration | Démarrage/sauvegarde | Lua/domaines | TCP métadonnées/reconnexion | Lecture variable | Écriture/persistance | Événement | E2E AP |
 |---|---|---|---|---|---|---|---|
-| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid | Inventaire validé | Validé | Inventaire statique concordant | Non testé | Non testé | Non testé |
+| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid ; quantité native persistante | Inventaire validé | Validé | Potion 1 → 0 corrélée au sac | Non testé | Non testé | Non testé |
 | Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
 
 ## Politique de repli
