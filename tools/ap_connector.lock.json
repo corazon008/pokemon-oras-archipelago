@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "repository": "ArchipelagoMW/Archipelago",
+  "commit": "cf08efe5b1c132bf966ae810c007b8268d47b7b0",
+  "files": [
+    {
+      "path": "connector_bizhawk_generic.lua",
+      "upstream_path": "data/lua/connector_bizhawk_generic.lua",
+      "sha256": "1fbc84eab657c0bff1b6a84264ef210a1206021ba567d3aa77fe05b6db626142"
+    },
+    {
+      "path": "base64.lua",
+      "upstream_path": "data/lua/base64.lua",
+      "sha256": "b3ffcb57ea66e8f55f075ea6a50b3b374d528034958d8b904f3fd462f6d4dd03"
+    },
+    {
+      "path": "json.lua",
+      "upstream_path": "data/lua/json.lua",
+      "sha256": "b83dffeb86687c69e8fd9e3701387504b1d5fdbb461ec67193fdd56fa19423bf"
+    },
+    {
+      "path": "lua_5_3_compat.lua",
+      "upstream_path": "data/lua/lua_5_3_compat.lua",
+      "sha256": "e1a14f7d5b2f07dec1d0a3e6bcc38ab57cdc0a220ee132873ec30fb2af602ba9"
+    },
+    {
+      "path": "socket.lua",
+      "upstream_path": "data/lua/socket.lua",
+      "sha256": "e416ecea1ac9f050d2e6fd89ba8a5a4b8cabfa21826280c2dac36c89ed1e580b"
+    },
+    {
+      "path": "x64/socket-linux-5-4.so",
+      "upstream_path": "data/lua/x64/socket-linux-5-4.so",
+      "sha256": "3fde2e0a08ef5e9d2a95e4806b49ceb39ff77a90c9e3a5e377f8d888441e0df2"
+    },
+    {
+      "path": "x64/luasocket.LICENSE.txt",
+      "upstream_path": "data/lua/x64/luasocket.LICENSE.txt",
+      "sha256": "5f659148241cb69165230ae22315341d4d4a0740a4635fbc232c02704157942e"
+    },
+    {
+      "path": "bizhawk_api.py",
+      "upstream_path": "worlds/_bizhawk/__init__.py",
+      "sha256": "b378789f4381e4ae89e1a4fce451b9df835c122c6d7bfe88ba2b54129736a8f5"
+    }
+  ]
+}

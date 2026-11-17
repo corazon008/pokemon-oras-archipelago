@@ -1,7 +1,8 @@
-# Sonde BizHawk / Encore
+# Sondes BizHawk / Encore
 
-Ces outils inventorient les capacités de Lua. Ils ne sont ni un client
-Archipelago, ni un test de lecture d'une variable ORAS.
+Ces outils inventorient les capacités de Lua et testent le transport AP.
+Ils ne constituent pas encore un client de jeu ORAS ni un test de lecture
+d'une variable de progression.
 
 ## Exécution isolée
 
@@ -63,3 +64,37 @@ luac5.4 -p tools/bizhawk_probe.lua
 Les tests Lua utilisent des API factices dont toute lecture/écriture mémoire
 lève une erreur. Ils vérifient l'outillage uniquement ; les essais Encore réels
 sont documentés séparément dans le rapport 002.
+
+## Connecteur TCP amont
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+```
+
+Ce diagnostic :
+
+- Télécharge les dépendances AP depuis un commit figé, dont LuaSocket Linux.
+- Vérifie chaque SHA-256 du fichier `ap_connector.lock.json` avant chargement.
+- Utilise le connecteur et l'API Python amont sans les modifier.
+- Envoie seulement `VERSION`, `PING`, `SYSTEM` et deux requêtes `MEMORY_SIZE`.
+- Vérifie une déconnexion/reconnexion et ferme sa propre instance via un signal
+  fichier traité par le wrapper Lua.
+- Produit `result.json`, `stdout.txt` et `stderr.txt` sous
+  `/tmp/opencode/oras-connector-*`.
+
+Connexion Internet nécessaire pour ces téléchargements. Aucun paquet système
+ni dépendance Python externe n'est installé. Plateforme ciblée : Linux x86_64.
+`--timeout` borne les essais réseau ; la fermeture dispose d'un délai distinct.
+Les logs permettent de distinguer une fermeture propre d'un arrêt forcé.
+
+Fermer les autres connecteurs avant l'essai : l'outil refuse de démarrer si leur
+plage de ports est occupée. Ne pas lancer plusieurs diagnostics simultanément.
+Les deux modules Python partagent la préparation du profil isolé.
+
+Attention : le connecteur amont expose aussi des commandes d'écriture mémoire.
+Le diagnostic ne les envoie pas, mais ce service doit rester sur loopback,
+sans redirection de port et sur une machine de confiance.
+
+Ces échanges ne sont pas le protocole WebSocket du serveur Archipelago.
+Voir le [rapport 003](../docs/reports/003-bizhawk-tcp.md).

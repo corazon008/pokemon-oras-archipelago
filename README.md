@@ -14,6 +14,8 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - Première analyse statique d'Archipelago, Émeraude, Noir/Blanc et Gen6 CTRPF réalisée.
 - Domaines mémoire et API Lua d'Encore identifiés dans les sources de BizHawk 2.11.1.
 - Les deux jeux atteignent le menu de langue ; inventaire Lua des domaines validé.
+- TCP Python ↔ connecteur AP et une reconnexion validés sur les deux jeux,
+  en métadonnées seulement.
 - Partie jouable, sauvegarde et lecture/écriture d'une variable encore non validées.
 - Aucun offset RAM, flag de location, item ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
@@ -25,12 +27,13 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Références figées et empreinte de l'APWorld Noir/Blanc](docs/research/sources.json).
 - [Rapport de recherche 001](docs/reports/001-research.md).
 - [Premiers essais BizHawk — rapport 002](docs/reports/002-bizhawk-capabilities.md).
+- [Connecteur TCP — rapport 003](docs/reports/003-bizhawk-tcp.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Préparer les dépendances Linux du connecteur AP, vérifier TCP, puis une
-sauvegarde de test jouable et la lecture d'une variable identifiée. Écriture
+Identifier les builds exacts, préparer une sauvegarde de test jouable et
+vérifier la lecture d'une variable identifiée. Écriture
 contrôlée et persistance viendront ensuite. Le développement du prototype
 Archipelago vient après ces preuves, pas à leur place.
 

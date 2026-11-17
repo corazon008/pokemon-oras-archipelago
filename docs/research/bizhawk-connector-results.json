@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "scope": "Upstream TCP metadata and one disconnect/reconnect per edition",
+  "ap_commit": "cf08efe5b1c132bf966ae810c007b8268d47b7b0",
+  "dependency_lock": "../../tools/ap_connector.lock.json",
+  "upstream_connector_modified": false,
+  "upstream_python_api_modified": false,
+  "lua_socket_platform": "Linux x86_64 / Lua 5.4",
+  "lua_socket_sha256": "3fde2e0a08ef5e9d2a95e4806b49ceb39ff77a90c9e3a5e377f8d888441e0df2",
+  "script_version_observed": 1,
+  "shared_responses": {
+    "PING": "PONG",
+    "SYSTEM": "3DS",
+    "FCRAM_size_bytes": 268435456,
+    "System_Bus_size_api_bytes": 0
+  },
+  "runs": [
+    {
+      "edition": "Omega Ruby",
+      "local_evidence_directory": "/tmp/opencode/oras-connector-l6lg47sv",
+      "initial_port": 43055,
+      "reconnection_port": 43056,
+      "successful_connections": 2,
+      "exit_code": 0,
+      "forced_shutdown": false,
+      "bundle_checksums_verified": true
+    },
+    {
+      "edition": "Alpha Sapphire",
+      "local_evidence_directory": "/tmp/opencode/oras-connector-682zwwyi",
+      "initial_port": 43055,
+      "reconnection_port": 43056,
+      "successful_connections": 2,
+      "exit_code": 0,
+      "forced_shutdown": false,
+      "bundle_checksums_verified": true
+    }
+  ],
+  "memory_read_requests": 0,
+  "memory_write_requests": 0,
+  "archipelago_server_connection_tested": false,
+  "concrete_game_variable_read_tested": false,
+  "persistent_item_delivery_tested": false
+}

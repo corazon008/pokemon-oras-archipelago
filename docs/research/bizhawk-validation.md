@@ -4,6 +4,9 @@ Statut au 17 novembre 2026 : **menu de langue atteint sur les deux jeux et
 inventaire Lua validé**. Gameplay, sauvegarde et accès à une variable non validés.
 Voir le [rapport 002](../reports/002-bizhawk-capabilities.md) et les
 [mesures](bizhawk-results.json).
+Le [rapport 003](../reports/003-bizhawk-tcp.md) valide en plus le transport TCP
+et une déconnexion/reconnexion sur les deux éditions, en métadonnées seulement.
+Cela ne suffit pas à valider BH-05 ou BH-09 dans leur totalité.
 
 ## Conditions préalables
 
@@ -122,10 +125,10 @@ Après validation des accès nécessaires :
 Le premier succès sur une édition n'implique pas le succès sur l'autre.
 La matrice reste indépendante :
 
-| Configuration | Démarrage/sauvegarde | Lua/domaines | Lecture | Écriture/persistance | Événement | E2E AP |
-|---|---|---|---|---|---|---|
-| Rubis Oméga — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Non testé | Non testé | Non testé | Non testé |
-| Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Non testé | Non testé | Non testé | Non testé |
+| Configuration | Démarrage/sauvegarde | Lua/domaines | TCP métadonnées/reconnexion | Lecture variable | Écriture/persistance | Événement | E2E AP |
+|---|---|---|---|---|---|---|---|
+| Rubis Oméga — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
+| Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
 
 ## Politique de repli
 

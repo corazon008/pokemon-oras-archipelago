@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "consulted_on": "2026-11-17",
-  "scope": "Static source research only; no ORAS runtime validation.",
+  "scope": "Upstream source references; runtime observations are recorded separately.",
   "sources": [
     {
       "id": "archipelago",
@@ -18,6 +18,10 @@
         "worlds/_bizhawk/context.py",
         "data/lua/connector_bizhawk_generic.lua",
         "data/lua/socket.lua",
+        "data/lua/base64.lua",
+        "data/lua/json.lua",
+        "data/lua/lua_5_3_compat.lua",
+        "data/lua/x64/luasocket.LICENSE.txt",
         "worlds/pokemon_emerald/__init__.py",
         "worlds/pokemon_emerald/client.py",
         "worlds/pokemon_emerald/rom.py",

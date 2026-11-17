@@ -66,6 +66,37 @@ def probe_succeeded(report: dict, exit_code: int | None) -> bool:
     )
 
 
+def prepare_runtime(source: Path, session: Path) -> Path:
+    """Copy emulator files but never the existing 3DS user directory."""
+    runtime = session / "runtime"
+
+    def ignore(directory: str, names: list[str]) -> set[str]:
+        if Path(directory) == source:
+            return set(names) & {
+                "3DS", "config.ini", "EmuHawkMono_laststdout.txt",
+                "EmuHawkMono_laststderr.txt",
+            }
+        return set()
+
+    shutil.copytree(source, runtime, ignore=ignore)
+    config_path = source / "config.ini"
+    config = json.loads(config_path.read_text()) if config_path.exists() else {}
+    (runtime / "config.ini").write_text(
+        json.dumps(isolate_config(config, runtime), indent=2) + "\n"
+    )
+    return runtime
+
+
+def emulator_environment(runtime: Path) -> dict[str, str]:
+    env = os.environ.copy()
+    env.update({
+        "LD_LIBRARY_PATH": f"{runtime}/dll:{runtime}:/usr/lib",
+        "MONO_CRASH_NOFILE": "1",
+        "MONO_WINFORMS_XIM_STYLE": "disabled",
+    })
+    return env
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -90,29 +121,10 @@ def main() -> int:
     temporary_root = Path("/tmp/opencode")
     temporary_root.mkdir(parents=True, exist_ok=True)
     session = Path(tempfile.mkdtemp(prefix="oras-bizhawk-", dir=temporary_root))
-    runtime = session / "runtime"
-
-    def ignore(directory: str, names: list[str]) -> set[str]:
-        if Path(directory) == source:
-            return set(names) & {
-                "3DS", "config.ini", "EmuHawkMono_laststdout.txt",
-                "EmuHawkMono_laststderr.txt",
-            }
-        return set()
-
-    # No symlinks/hardlinks to writable profiles. Never copy the existing 3DS user data.
-    shutil.copytree(source, runtime, ignore=ignore)
-    original_config_path = source / "config.ini"
-    config = json.loads(original_config_path.read_text()) if original_config_path.exists() else {}
-    (runtime / "config.ini").write_text(
-        json.dumps(isolate_config(config, runtime), indent=2) + "\n"
-    )
+    runtime = prepare_runtime(source, session)
     report_path = session / "capabilities.json"
-    env = os.environ.copy()
+    env = emulator_environment(runtime)
     env.update({
-        "LD_LIBRARY_PATH": f"{runtime}/dll:{runtime}:/usr/lib",
-        "MONO_CRASH_NOFILE": "1",
-        "MONO_WINFORMS_XIM_STYLE": "disabled",
         "ORAS_PROBE_OUTPUT": str(report_path),
         "ORAS_PROBE_FRAMES": str(args.frames),
         "ORAS_PROBE_SCREENSHOT": str(session / "screen.png"),
