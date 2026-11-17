@@ -321,3 +321,26 @@ Pour comparer deux fichiers, sans émulateur ni modification :
 ```sh
 python3 tools/oras_events.py /copie/avant/main /copie/apres/main
 ```
+
+### EventWork via l'API Archipelago, sans nouvelle copie
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "/chemin/vers/OR-verifie.3ds" \
+  --session /tmp/opencode/oras-save-IDENTIFIANT \
+  --read-event-work --speed 400 --timeout 150
+```
+
+Fermer tout émulateur utilisant ce profil avant lancement. Le manifeste doit
+correspondre au SHA-256 ROM exact. Les résultats sont dans un
+`connector-attempt-*`, le runtime et la sauvegarde ne sont pas réimportés.
+Les bindings clavier sont conservés.
+
+Code, inventaire et EventWork sont relus avant/après reconnexion. Ce diagnostic
+exige encore un inventaire non nul. Le fichier `main` entier doit rester inchangé.
+Les états du candidat non observés sont **inconnus**, jamais déduits d'un seuil.
+Ce n'est pas un check de location ni un client AP.
+
+`--session` et `--seed-save` sont exclusifs. L'écriture expérimentale exige
+toujours une nouvelle copie depuis `--seed-save`, sans `--read-event-work`.
+Voir le [rapport 011](../docs/reports/011-clock-event-follow-up-and-ap-read.md).

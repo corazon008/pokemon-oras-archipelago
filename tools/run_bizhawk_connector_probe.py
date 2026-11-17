@@ -16,7 +16,7 @@ import tempfile
 
 from ap_connector_bundle import fetch_bundle, load_upstream_api
 from run_bizhawk_probe import (
-    PROJECT_ROOT, emulator_environment, prepare_runtime, sha256,
+    PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
 from rom_identity import CodeReference, inspect_rom, sha256_file
 from run_bizhawk_save_probe import parse_steps, save_destination, seed_archive
@@ -25,6 +25,8 @@ from oras_connector_inventory import (
     add_experimental_potion, load_inventory_reference, potion_transition, read_inventory,
 )
 from oras_save import inspect_save, inventory_bytes
+from oras_events import event_bytes
+from oras_connector_events import BOOT_GAMEPLAY_STEPS, EventReference, load_event_reference, read_events
 
 
 REQUESTS = (
@@ -79,7 +81,10 @@ async def exercise_connector(api, process, timeout: float,
                               code_reference: CodeReference | None = None,
                               audit: dict | None = None,
                               inventory_reference: InventoryReference | None = None,
-                              potion_rom_hash: str | None = None) -> list[dict]:
+                              potion_rom_hash: str | None = None,
+                              event_reference: EventReference | None = None) -> list[dict]:
+    if event_reference is not None and (code_reference is None or audit is None):
+        raise ValueError("Event reads require a runtime code guard and audit")
     if potion_rom_hash is not None:
         if code_reference is None or inventory_reference is None or audit is None:
             raise ValueError("Potion experiment requires code, inventory and audit")
@@ -123,6 +128,8 @@ async def exercise_connector(api, process, timeout: float,
                 if code_reference is None or audit is None:
                     raise ValueError("Inventory reads require a runtime code guard and audit")
                 exchange["inventory_read"] = await read_inventory(api, context, inventory_reference, audit)
+            if event_reference is not None:
+                exchange["event_read"] = await read_events(api, context, event_reference, audit)
             if potion_rom_hash is not None and attempt == 1:
                 inventory_reference = await add_experimental_potion(
                     api, context, potion_rom_hash, code_reference, inventory_reference, audit,
@@ -148,13 +155,32 @@ async def finish_native_ui(process, signal: Path, marker: Path, timeout: float) 
     raise TimeoutError("Native save macro timed out; do not retry memory write")
 
 
+def reuse_profile(path: Path, rom_hash: str) -> tuple[Path, dict]:
+    """Reuse only a matching tool-created profile; never import another save."""
+    path = path.resolve()
+    temporary_root = Path("/tmp/opencode").resolve()
+    if not path.is_relative_to(temporary_root) or path == temporary_root:
+        raise ValueError("Reusable profiles must be private children of /tmp/opencode")
+    manifest = json.loads((path / "profile.json").read_text())
+    if manifest.get("kind") != "oras_native_save_probe" or manifest.get("rom_sha256") != rom_hash:
+        raise ValueError("Profile/ROM identity mismatch")
+    runtime = path / "runtime"
+    if runtime.is_symlink() or not runtime.resolve().is_relative_to(path):
+        raise ValueError("Runtime must stay inside the test profile")
+    config_path = runtime / "config.ini"
+    config_path.write_text(json.dumps(isolate_config(json.loads(config_path.read_text()), runtime), indent=2) + "\n")
+    return runtime, manifest
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bizhawk", type=Path, default=PROJECT_ROOT / "bin/BizHawk-2.11.1-linux-x64")
     parser.add_argument("--rom", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument("--seed-save", type=Path, help="Copy a validated save/archive; read inventory after native boot")
-    parser.add_argument("--steps", default=BOOT_MEDICINE_STEPS, help="Native boot/Bag steps, only with --seed-save")
+    parser.add_argument("--session", type=Path, help="Reuse an identified tool-created profile for read-only probes")
+    parser.add_argument("--read-event-work", action="store_true", help="Read full EventWork plus bounded clock-scene candidate")
+    parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument(
         "--experimental-potion-1-to-2", action="store_true",
@@ -172,10 +198,17 @@ def main() -> int:
         parser.error("Timeout must be positive and finite")
     if not 1 <= args.speed <= 1000:
         parser.error("Speed must be between 1 and 1000 percent")
+    if args.seed_save and args.session:
+        parser.error("--seed-save and --session are mutually exclusive")
+    has_profile = bool(args.seed_save or args.session)
+    if args.read_event_work and not has_profile:
+        parser.error("--read-event-work requires --seed-save or --session")
+    if args.read_event_work and args.experimental_potion_1_to_2:
+        parser.error("Event probes are read-only; do not combine with the Potion experiment")
     if args.experimental_potion_1_to_2 and not args.seed_save:
         parser.error("--experimental-potion-1-to-2 requires --seed-save (fresh private copy)")
     try:
-        steps = parse_steps(args.steps)
+        steps = parse_steps(args.steps or (BOOT_GAMEPLAY_STEPS if args.read_event_work else BOOT_MEDICINE_STEPS))
     except ValueError as error:
         parser.error(str(error))
     if not (source / "EmuHawk.exe").is_file() or not rom.is_file():
@@ -186,7 +219,13 @@ def main() -> int:
     require_free_ports()
     temporary_root = Path("/tmp/opencode")
     temporary_root.mkdir(parents=True, exist_ok=True)
-    session = Path(tempfile.mkdtemp(prefix="oras-connector-", dir=temporary_root))
+    if args.session:
+        profile_path = args.session.resolve()
+        if not profile_path.is_relative_to(temporary_root) or profile_path == temporary_root:
+            parser.error("Reusable profiles must be private children of /tmp/opencode")
+        session = Path(tempfile.mkdtemp(prefix="connector-attempt-", dir=profile_path))
+    else:
+        session = Path(tempfile.mkdtemp(prefix="oras-connector-", dir=temporary_root))
     print(f"Isolated connector session: {session}", flush=True)
     report = {
         "schema_version": 1,
@@ -202,7 +241,8 @@ def main() -> int:
     try:
         code_reference = None
         inventory_reference = None
-        if args.read_code or args.seed_save:
+        event_reference = None
+        if args.read_code or has_profile:
             identity, code_reference = inspect_rom(rom)
             if identity["edition_from_program_id"] is None or code_reference is None:
                 raise ValueError("ROM has no supported ORAS text-prefix reference")
@@ -212,19 +252,32 @@ def main() -> int:
         bundle = session / "connector"
         lock = fetch_bundle(bundle)
         api = load_upstream_api(bundle, lock)
-        runtime = prepare_runtime(source, session)
-        if args.seed_save:
-            inventory_reference = load_inventory_reference(
-                identity["rom_sha256"], identity["program_id"], args.seed_save,
-            )
-            archive = seed_archive(args.seed_save, save_destination(runtime, identity["program_id"]))
+        if args.session:
+            runtime, archive = reuse_profile(args.session, identity["rom_sha256"])
+            report["reused_profile"] = str(args.session.resolve())
             report["archive"] = archive
+        else:
+            runtime = prepare_runtime(source, session)
+        if has_profile:
+            profile_save = args.seed_save or save_destination(runtime, identity["program_id"])
+            inventory_reference = load_inventory_reference(
+                identity["rom_sha256"], identity["program_id"], profile_save,
+            )
+            if args.seed_save:
+                archive = seed_archive(args.seed_save, save_destination(runtime, identity["program_id"]))
+                report["archive"] = archive
+            report["save_sha256_before_launch"] = sha256(save_destination(runtime, identity["program_id"]))
             report["scope"] = "TCP metadata, code and validated inventory reads, including reconnection"
             report["native_boot_steps"] = steps
             report["speed_percent"] = args.speed
             if args.experimental_potion_1_to_2:
                 potion_transition(identity["rom_sha256"], code_reference, inventory_reference)
                 report["scope"] = "Experimental guarded Potion 1-to-2, readback, reconnect and native save"
+            if args.read_event_work:
+                event_reference = load_event_reference(
+                    identity["rom_sha256"], identity["program_id"], profile_save,
+                )
+                report["scope"] = "Read-only AP transport: code, inventory and EventWork before/after reconnect"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -234,7 +287,7 @@ def main() -> int:
             "ORAS_CONNECTOR_STOP": str(stop_file),
             "ORAS_CONNECTOR_TIMEOUT": str(math.ceil(args.timeout) + 10),
         })
-        if args.seed_save:
+        if has_profile:
             capture = session / "boot"
             capture.mkdir()
             plan = capture / "steps.txt"
@@ -263,8 +316,8 @@ def main() -> int:
         ]
         report.update({
             "ap_commit": lock["commit"],
-            "emuhawk_sha256": sha256(source / "EmuHawk.exe"),
-            "encore_sha256": sha256(source / "dll/libencore.so"),
+            "emuhawk_sha256": sha256(runtime / "EmuHawk.exe"),
+            "encore_sha256": sha256(runtime / "dll/libencore.so"),
             "bundle_verified": True,
         })
         with (session / "stdout.txt").open("w") as stdout, (session / "stderr.txt").open("w") as stderr:
@@ -275,6 +328,7 @@ def main() -> int:
                         exercise_connector(
                             api, process, args.timeout, code_reference, report, inventory_reference,
                             identity["rom_sha256"] if args.experimental_potion_1_to_2 else None,
+                            event_reference,
                         ),
                         timeout=args.timeout,
                     )
@@ -295,7 +349,7 @@ def main() -> int:
         report["exit_code"] = process.returncode
         if process.returncode != 0 or report.get("forced_shutdown"):
             raise RuntimeError("EmuHawk did not shut down cleanly")
-        if args.seed_save:
+        if has_profile:
             target = save_destination(runtime, identity["program_id"])
             report["resulting_save"] = inspect_save(target.read_bytes())
             expected_inventory = (
@@ -305,11 +359,20 @@ def main() -> int:
             if inventory_bytes(target.read_bytes()) != expected_inventory:
                 raise ValueError("Saved inventory does not match expected experiment result")
             report["saved_inventory_matches_expected"] = True
+            if event_reference is not None:
+                if event_bytes(target.read_bytes()) != event_reference.expected:
+                    raise ValueError("Saved EventWork changed during read-only probe")
+                report["saved_events_match_reference"] = True
+            if not args.experimental_potion_1_to_2:
+                report["save_unchanged"] = sha256(target) == report["save_sha256_before_launch"]
+                if not report["save_unchanged"]:
+                    raise ValueError("Save file changed during read-only probe")
             # A hash-bound manifest permits a subsequent cold reload with the native UI tool.
-            (session / "profile.json").write_text(json.dumps({
-                **archive, "kind": "oras_native_save_probe", "program_id": identity["program_id"],
-                "rom_sha256": identity["rom_sha256"],
-            }, indent=2) + "\n")
+            if args.seed_save:
+                (session / "profile.json").write_text(json.dumps({
+                    **archive, "kind": "oras_native_save_probe", "program_id": identity["program_id"],
+                    "rom_sha256": identity["rom_sha256"],
+                }, indent=2) + "\n")
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"
@@ -322,6 +385,8 @@ def main() -> int:
             report["exit_code"] = process.returncode
         if archive is not None:
             for prefix in ("seed", "archive_metadata"):
+                if not archive.get(f"{prefix}_source"):
+                    continue
                 try:
                     unchanged = sha256(Path(archive[f"{prefix}_source"])) == archive[f"{prefix}_sha256"]
                 except OSError:

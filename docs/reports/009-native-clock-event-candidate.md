@@ -156,3 +156,7 @@ BH-08 dispose désormais d'un candidat avec témoins négatifs et rechargement.
 Il reste à vérifier la suite du scénario, puis à relire ce signal par l'API AP
 avant d'approuver une règle de location. Pas de `LocationChecks`, serveur,
 index persistant, livraison idempotente ni APWorld dans cette phase.
+
+Mise à jour : le [rapport 011](011-clock-event-follow-up-and-ap-read.md) documente
+depuis un état ultérieur 4 et la lecture AP des états 3/4. Il ne valide pas une
+règle générale `>= 3` ni la permanence sur toute la partie.

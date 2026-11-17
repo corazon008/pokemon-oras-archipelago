@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "ap_commit": "cf08efe5b1c132bf966ae810c007b8268d47b7b0",
+  "source_save_sha256_unchanged": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+  "manual_play": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/attempt-z2tn_bf_",
+    "keyboard_only": true,
+    "before_work_130": 3,
+    "after_work_130": 4,
+    "save_sha256": "99c19458cf96f097f15f0e63c1d0fe72d689f06d76cc3bebe48dc0224d548356",
+    "valid_crc_blocks": 58,
+    "event_block_sha256": "56973ed746824c0303eecfbb73e67a068baa18825e9d2686d50281d2605fa6ed",
+    "event_work_changes": [
+      {"index": 10, "before": 0, "after": 1},
+      {"index": 17, "before": 1, "after": 0},
+      {"index": 115, "before": 0, "after": 1},
+      {"index": 130, "before": 3, "after": 4}
+    ],
+    "event_flag_changes": [],
+    "unknown_tail_changed_offsets": [],
+    "exact_intermediate_actions_recorded": false,
+    "exit_code": 0
+  },
+  "cold_reload": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/attempt-u3al77pe",
+    "ui_capture": "step-07.png",
+    "observed_position": "Downstairs in player's home, beside mother and television",
+    "work_130": 4,
+    "event_block_matches_crc_validated_save": true,
+    "save_sha256_unchanged": "99c19458cf96f097f15f0e63c1d0fe72d689f06d76cc3bebe48dc0224d548356",
+    "memory_read_requests": 2,
+    "memory_write_requests": 0,
+    "savestate_used": false,
+    "exit_code": 0
+  },
+  "ap_reads": [
+    {
+      "evidence": "/tmp/opencode/oras-save-pmlcj2zw/connector-attempt-guej9ygb",
+      "reused_profile": "/tmp/opencode/oras-save-pmlcj2zw",
+      "work_130_each_connection": [3, 3],
+      "memory_read_requests": 6,
+      "memory_write_requests": 0,
+      "full_event_block_matches_save": true,
+      "save_unchanged": true,
+      "exit_code": 0
+    },
+    {
+      "evidence": "/tmp/opencode/oras-save-ev5_8vq1/connector-attempt-hu7mlw_0",
+      "reused_profile": "/tmp/opencode/oras-save-ev5_8vq1",
+      "work_130_each_connection": [4, 4],
+      "memory_read_requests": 6,
+      "memory_write_requests": 0,
+      "full_event_block_matches_save": true,
+      "save_unchanged": true,
+      "exit_code": 0
+    }
+  ],
+  "candidate_classifier": {
+    "2": false,
+    "3": true,
+    "4": true,
+    "other_values": null,
+    "other_values_mean": "Unknown; never infer >= 3, never send an AP check"
+  },
+  "raw_work_equals_3_is_a_permanent_flag": false,
+  "all_later_story_states_validated": false,
+  "negative_state_2_read_via_ap_validated": false,
+  "production_location_approved": false,
+  "location_check_sent": false,
+  "item_delivery_validated": false
+}

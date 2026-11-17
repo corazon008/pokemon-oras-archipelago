@@ -68,8 +68,8 @@
     "savestate_used": false,
     "exit_code": 0
   },
-  "later_story_state_validation": "Pending separate manual gameplay experiment",
-  "event_read_via_ap_connector_validated": false,
+  "later_story_state_validation": "Manual follow-up reached work[130] = 4; see clock-event-follow-up-results.json",
+  "event_read_via_ap_connector_validated": true,
   "ap_location_check_validated": false,
   "alpha_sapphire_event_validated": false
 }

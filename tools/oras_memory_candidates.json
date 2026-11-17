@@ -14,7 +14,9 @@
         "search_evidence": "/tmp/opencode/oras-save-pmlcj2zw/attempt-772ewrho",
         "read_observations": [
           "/tmp/opencode/oras-save-pmlcj2zw/attempt-178wch3s",
-          "/tmp/opencode/oras-save-ev5_8vq1/attempt-wwboxv66"
+          "/tmp/opencode/oras-save-ev5_8vq1/attempt-wwboxv66",
+          "/tmp/opencode/oras-save-pmlcj2zw/connector-attempt-guej9ygb",
+          "/tmp/opencode/oras-save-ev5_8vq1/connector-attempt-hu7mlw_0"
         ],
         "clock_scene_candidate": {
           "work_index_decimal": 130,
@@ -23,9 +25,12 @@
           "type": "little-endian uint16",
           "observed_before": 2,
           "observed_after": 3,
+          "observed_later": 4,
+          "observed_state_classification": {"2": false, "3": true, "4": true},
+          "other_states": "unknown, not false and not inferred from >= 3",
           "production_location_approved": false
         },
-        "status": "Full-block reads validated; native clock/mother scene work[130] 2-to-3 saved and cold-reloaded. Later story states not yet validated.",
+        "status": "Native 2-to-3 transition persisted; manual progression reached 4. States 3 and 4 read through AP API before/after reconnect. No universal monotonic predicate or location approval.",
         "write_allowed": false
       },
       "write_allowed": false,
