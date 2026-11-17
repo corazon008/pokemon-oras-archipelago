@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "source_session": "/tmp/opencode/oras-save-utuw0b7e",
+  "source_save_sha256_unchanged": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+  "event_block": {
+    "save_block_id": 19,
+    "save_file_offset": "0x14A00",
+    "length": 1284,
+    "work_count": 376,
+    "flag_count": 3328,
+    "flag_offset_in_block": "0x2F0",
+    "unknown_tail_offset_in_block": "0x490",
+    "domain": "System Bus",
+    "ram_address": "0x08C7DAEC"
+  },
+  "heap_search": {
+    "evidence": "/tmp/opencode/oras-save-pmlcj2zw/attempt-772ewrho",
+    "start": "0x08000000",
+    "end_exclusive": "0x10000000",
+    "read_requests": 128,
+    "matches": ["0x08C7DAEC"],
+    "exit_code": 0
+  },
+  "candidate": {
+    "name": "Completion of initial clock and upstairs mother conversation sequence",
+    "work_index_decimal": 130,
+    "offset_in_block": "0x104",
+    "ram_address": "0x08C7DBF0",
+    "type": "little-endian uint16",
+    "before": 2,
+    "after": 3,
+    "semantics_origin": "Native differential observation, not an upstream named constant",
+    "general_monotonic_predicate_validated": false,
+    "production_location_approved": false
+  },
+  "native_transition": {
+    "evidence": "/tmp/opencode/oras-save-pmlcj2zw/attempt-178wch3s",
+    "baseline_sample_step": 7,
+    "negative_entered_bedroom_step": 12,
+    "negative_near_clock_without_A_step": 16,
+    "negative_dialogue_not_completed_step": 30,
+    "positive_completed_sequence_steps": [44, 48],
+    "work_130_values_at_samples": [2, 2, 2, 2, 3, 3],
+    "non_event_candidates": {
+      "flag_102": "Already changed on entering bedroom; not specific to clock sequence completion",
+      "work_17": "Already changed when approaching clock without A; not specific to completion",
+      "flag_610": "Changes during conversation, then returns to initial value"
+    },
+    "memory_read_requests": 7,
+    "memory_write_requests": 0,
+    "saved_message_capture": "step-58.png",
+    "resulting_save_sha256": "1c933f1cf0be502bda4748135bf4ec1301e6deb0c9670acafb59bcef0312434a",
+    "event_block_sha256_before": "a96935c5b73b8de632d683bbaf66df95a7e9447c3d0cc5410a400f9bc50d921d",
+    "event_block_sha256_after": "5fa7ebd0d52f0e6eb0f72084be6b576a050a2968e805f682d55e56cedb094947",
+    "valid_crc_blocks": 58,
+    "exit_code": 0
+  },
+  "cold_reload": {
+    "evidence": "/tmp/opencode/oras-save-ev5_8vq1/attempt-wwboxv66",
+    "seeded_from": "/tmp/opencode/oras-save-pmlcj2zw",
+    "event_block_matches_crc_validated_save": true,
+    "work_130": 3,
+    "memory_read_requests": 2,
+    "memory_write_requests": 0,
+    "savestate_used": false,
+    "exit_code": 0
+  },
+  "later_story_state_validation": "Pending separate manual gameplay experiment",
+  "event_read_via_ap_connector_validated": false,
+  "ap_location_check_validated": false,
+  "alpha_sapphire_event_validated": false
+}

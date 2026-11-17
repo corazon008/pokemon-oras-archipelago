@@ -12,6 +12,7 @@ import tempfile
 
 from rom_identity import inspect_rom, sha256_file
 from oras_save import validate_save, inventory_bytes, inventory_entries, compare_medicine_change
+from oras_events import event_bytes, compare_events, EVENT_LENGTH
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
@@ -107,6 +108,9 @@ def main() -> int:
     )
     parser.add_argument("--sample-step", type=int, help="Read inventory once more after this native UI step")
     parser.add_argument("--expect-medicine", help="Verify a native quantity change, e.g. 17:0; no game writes")
+    parser.add_argument("--scan-event-work", action="store_true", help="Search for CRC-validated EventWork block")
+    parser.add_argument("--read-event-work", action="store_true", help="Observe a documented EventWork RAM candidate")
+    parser.add_argument("--event-sample-steps", default="", help="Read EventWork after these comma-separated UI steps")
     args = parser.parse_args()
     try:
         steps = parse_steps(args.steps)
@@ -116,9 +120,10 @@ def main() -> int:
         parser.error("Timeout must be positive and finite")
     if args.session and args.seed_save:
         parser.error("--session and --seed-save are mutually exclusive")
-    if args.read_inventory and args.scan_inventory:
-        parser.error("Choose a single inventory observation mode")
-    if args.interactive and (args.read_inventory or args.scan_inventory or args.speed != 100):
+    event_mode = args.scan_event_work or args.read_event_work
+    if sum((args.read_inventory, args.scan_inventory, args.scan_event_work, args.read_event_work)) > 1:
+        parser.error("Choose a single memory observation mode")
+    if args.interactive and (args.read_inventory or args.scan_inventory or event_mode or args.speed != 100):
         parser.error("Interactive mode does not support memory observation or speed overrides")
     if not 1 <= args.speed <= 1000:
         parser.error("Speed must be between 1 and 1000 percent")
@@ -136,6 +141,15 @@ def main() -> int:
             parser.error("--expect-medicine must be item_id:quantity within valid integer bounds")
         if args.sample_step is None:
             parser.error("--expect-medicine requires --sample-step")
+    event_samples = []
+    if args.event_sample_steps:
+        try:
+            event_samples = [int(value) for value in args.event_sample_steps.split(",")]
+            if (not args.read_event_work or len(set(event_samples)) != len(event_samples)
+                    or any(not 1 <= step <= len(steps) for step in event_samples)):
+                raise ValueError
+        except ValueError:
+            parser.error("--event-sample-steps requires --read-event-work and distinct valid step indices")
     if args.seed_save:
         try:
             validate_save_container(args.seed_save)
@@ -189,6 +203,35 @@ def main() -> int:
     })
     reference = None
     candidate = None
+    if event_mode:
+        candidates = json.loads((PROJECT_ROOT / "tools/oras_memory_candidates.json").read_text())
+        candidate = candidates["profiles"].get(rom_hash)
+        if (candidate is None or candidate["program_id"] != identity["program_id"]
+                or candidate["domain"] != "System Bus" or candidate["write_allowed"] is not False):
+            parser.error("No read-only event research profile for this exact ROM")
+        reference = event_bytes(save_destination(runtime, identity["program_id"]).read_bytes())
+        if not any(reference):
+            parser.error("All-zero event search references are not accepted")
+        env.update({
+            "ORAS_UI_SCRIPT": str(PROJECT_ROOT / "tools/bizhawk_ui_probe.lua"),
+            "ORAS_UI_CONTINUE": "1", "ORAS_EVENT_MODE": "scan" if args.scan_event_work else "read",
+        })
+        if args.scan_event_work:
+            ref_path = attempt / "event-reference.bin"
+            ref_path.write_bytes(reference)
+            env.update({
+                "ORAS_EVENT_REFERENCE": str(ref_path),
+                "ORAS_EVENT_SEARCH_SCRIPT": str(PROJECT_ROOT / "tools/inventory_search.lua"),
+            })
+        else:
+            event_candidate = candidate.get("event_work")
+            if (not event_candidate or event_candidate["length"] != EVENT_LENGTH
+                    or event_candidate.get("write_allowed") is not False):
+                parser.error("No documented EventWork RAM candidate; search must precede observation")
+            env.update({
+                "ORAS_EVENT_ADDRESS": str(int(event_candidate["address"], 16)),
+                "ORAS_EVENT_SAMPLE_STEPS": ",".join(str(step) for step in event_samples),
+            })
     if args.read_inventory or args.scan_inventory:
         candidates = json.loads((PROJECT_ROOT / "tools/oras_memory_candidates.json").read_text())
         candidate = candidates["profiles"].get(rom_hash)
@@ -217,7 +260,9 @@ def main() -> int:
             })
     command = [mono, str(runtime / "EmuHawk.exe"), f"--config={runtime / 'config.ini'}"]
     if not args.interactive:
-        if args.scan_inventory:
+        if event_mode:
+            script = "bizhawk_event_probe.lua"
+        elif args.scan_inventory:
             script = "bizhawk_inventory_search.lua"
         else:
             script = "bizhawk_inventory_probe.lua" if args.read_inventory else "bizhawk_ui_probe.lua"
@@ -254,6 +299,40 @@ def main() -> int:
     target = save_destination(runtime, identity["program_id"])
     report["native_save_exists"] = target.exists()
     report["native_save_sha256"] = sha256(target) if target.exists() else None
+    if event_mode:
+        report["scope"] = "Read-only EventWork search" if args.scan_event_work else "Native UI with read-only EventWork observations"
+        journal = attempt / "event-read-requests.txt"
+        report["memory_read_requests"] = len(journal.read_text().splitlines()) if journal.exists() else 0
+        if args.scan_event_work:
+            matches_path = attempt / "event-matches.txt"
+            matches = matches_path.read_text().splitlines() if matches_path.exists() else []
+            report["event_search"] = {
+                "domain": "System Bus", "start": "0x08000000", "end_exclusive": "0x10000000",
+                "length": len(reference), "matches": matches, "unique_match": len(matches) == 1,
+            }
+            report["complete"] = report["complete"] and len(matches) == 1
+        else:
+            samples = {}
+            for step in sorted(event_samples):
+                path = attempt / f"event-step-{step:02d}.bin"
+                if path.exists():
+                    samples[str(step)] = compare_events(reference, path.read_bytes())
+            final = attempt / "event-final.bin"
+            report["event_observation"] = {
+                "domain": "System Bus", "address": event_candidate["address"], "length": EVENT_LENGTH,
+                "samples": samples,
+                "final_vs_save_before_launch": compare_events(reference, final.read_bytes()) if final.exists() else None,
+            }
+            baseline_matches = not event_samples or (
+                str(min(event_samples)) in samples and samples[str(min(event_samples))]["matches_reference"]
+            )
+            report["event_observation"]["baseline_matches_validated_save"] = baseline_matches if event_samples else None
+            report["complete"] = (
+                report["complete"] and final.exists() and len(samples) == len(event_samples) and baseline_matches
+            )
+        if target.exists():
+            # The game, not this tool, is responsible for any save-file changes.
+            report["saved_event_vs_before_launch"] = compare_events(reference, event_bytes(target.read_bytes()))
     if args.read_inventory:
         report["scope"] = "Native UI and one explicit read-only inventory candidate"
         journal = attempt / "inventory-read-requests.txt"

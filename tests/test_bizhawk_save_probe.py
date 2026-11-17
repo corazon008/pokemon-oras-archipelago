@@ -70,6 +70,69 @@ class SaveProbeTests(unittest.TestCase):
 
 @unittest.skipUnless(LUA, "Lua is not installed")
 class NativeInputTests(unittest.TestCase):
+    def test_event_observer_samples_steps_and_final_without_writes(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            root = Path(directory)
+            (root / "steps.txt").write_text("3:-\n2:A\n2:-\n")
+            fixture = """
+local reads, frames = 0, 0
+joypad = {get=function() return {A=false} end, set=function() end}
+emu = {frameadvance=function() frames=frames+1 end, framecount=function() return frames end}
+client = {screenshot=function() end, exit=function() assert(reads == 3) end}
+memory = setmetatable({
+    read_bytes_as_binary_string=function(address, length, domain)
+        assert(address == 0x08C7DAEC and length == 0x504 and domain == "System Bus")
+        reads=reads+1
+        return string.rep(string.char(reads), length)
+    end,
+}, {__index=function() error("Unexpected memory API") end})
+dofile(%s)
+"""
+            env = os.environ.copy()
+            env.update({
+                "ORAS_UI_PLAN": str(root / "steps.txt"), "ORAS_UI_CAPTURE": str(root),
+                "ORAS_UI_SCRIPT": str(ROOT / "tools/bizhawk_ui_probe.lua"),
+                "ORAS_UI_CONTINUE": "1", "ORAS_UI_SPEED": "100",
+                "ORAS_EVENT_MODE": "read", "ORAS_EVENT_ADDRESS": str(0x08C7DAEC),
+                "ORAS_EVENT_SAMPLE_STEPS": "1,2",
+            })
+            result = subprocess.run(
+                [LUA, "-"], input=fixture % repr(str(ROOT / "tools/bizhawk_event_probe.lua")),
+                env=env, text=True, capture_output=True, timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for name, byte in (("event-step-01", 1), ("event-step-02", 2), ("event-final", 3)):
+                self.assertEqual((root / f"{name}.bin").read_bytes(), bytes([byte]) * 0x504)
+            self.assertEqual(len((root / "event-read-requests.txt").read_text().splitlines()), 3)
+
+    def test_event_observer_counts_and_rejects_incomplete_read(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            root = Path(directory)
+            (root / "steps.txt").write_text("1:-\n")
+            fixture = """
+joypad = {get=function() return {A=false} end, set=function() end}
+emu = {frameadvance=function() end, framecount=function() return 1 end}
+client = {screenshot=function() end, exit=function() error("Must not succeed") end}
+memory = {read_bytes_as_binary_string=function() return string.rep("\\0", 0x503) end}
+dofile(%s)
+"""
+            env = os.environ.copy()
+            env.update({
+                "ORAS_UI_PLAN": str(root / "steps.txt"), "ORAS_UI_CAPTURE": str(root),
+                "ORAS_UI_SCRIPT": str(ROOT / "tools/bizhawk_ui_probe.lua"),
+                "ORAS_UI_CONTINUE": "1", "ORAS_UI_SPEED": "100",
+                "ORAS_EVENT_MODE": "read", "ORAS_EVENT_ADDRESS": str(0x08C7DAEC),
+                "ORAS_EVENT_SAMPLE_STEPS": "",
+            })
+            result = subprocess.run(
+                [LUA, "-"], input=fixture % repr(str(ROOT / "tools/bizhawk_event_probe.lua")),
+                env=env, text=True, capture_output=True, timeout=10,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("Incomplete event memory read", result.stderr)
+            self.assertEqual(len((root / "event-read-requests.txt").read_text().splitlines()), 1)
+            self.assertFalse((root / "event-final.bin").exists())
+
     def test_connector_post_ui_waits_for_signal_and_never_calls_memory(self):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             root = Path(directory)

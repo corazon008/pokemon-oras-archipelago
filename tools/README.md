@@ -273,3 +273,26 @@ Les macros sont dépendantes du contexte UI. Une macro terminée ou une
 variation RAM réussie ne prouve pas une sauvegarde : vérifier le message natif,
 le fichier, ses CRC puis un redémarrage. Les preuves observées sont dans le
 [rapport 007](../docs/reports/007-native-quantity-and-persistence.md).
+
+## Rechercher et observer EventWork
+
+- `--scan-event-work` cherche le bloc 19 complet d'une sauvegarde CRC-valide
+  dans le tas documenté d'Encore, sans supposer une adresse relative au sac.
+- `--read-event-work` utilise seulement un candidat documenté pour le SHA-256
+  ROM exact. Le catalogue maintient les écritures interdites.
+- `--event-sample-steps 7,12,16` lit après ces étapes natives, puis à la fin.
+  Les indices doivent être distincts et appartenir au plan UI.
+- Avec des échantillons intermédiaires, le premier dans l'ordre chronologique
+  doit correspondre au fichier validé avant lancement, sinon l'essai échoue.
+- Ces modes sont exclusifs entre eux, avec les modes inventaire et avec
+  l'interactif. Aucun octet mémoire n'est modifié.
+
+Les différences séparent mots uint16, flags et fin du bloc sans sémantique
+connue. Une lecture terminée ne prouve pas une fin d'événement. Voir le
+[rapport 009](../docs/reports/009-native-clock-event-candidate.md) et son plan natif.
+
+Pour comparer deux fichiers, sans émulateur ni modification :
+
+```sh
+python3 tools/oras_events.py /copie/avant/main /copie/apres/main
+```

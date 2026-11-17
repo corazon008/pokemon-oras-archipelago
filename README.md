@@ -24,6 +24,8 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
   validées dans la copie.
 - OR : lecture d'inventaire via API AP, écriture expérimentale gardée Potion
   1 → 2, reconnexion et persistance native vérifiées sur copie isolée.
+- OR : bloc EventWork retrouvé ; candidat horloge/conversation à l'étage
+  observé avec témoins négatifs, sauvegarde et rechargement. Suite à vérifier.
 - Aucun flag de location, ID Archipelago ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
 - Profil interactif isolé disponible ; sauvegarde OR jouable reçue et préservée.
@@ -41,11 +43,12 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Rechargement et lecture d'inventaire — rapport 006](docs/reports/006-native-reload-and-inventory.md).
 - [Variation native et persistance — rapport 007](docs/reports/007-native-quantity-and-persistence.md).
 - [Inventaire via AP et première écriture — rapport 008](docs/reports/008-connector-inventory-and-write.md).
+- [Candidat d'événement natif — rapport 009](docs/reports/009-native-clock-event-candidate.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Identifier un événement permanent réel avec témoins négatifs et rechargement.
+Vérifier le candidat d'événement lors de la suite du scénario, puis via le pont AP.
 La boucle serveur et la livraison idempotente restent à développer ; l'essai
 de quantité ne les remplace pas.
 

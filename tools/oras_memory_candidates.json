@@ -7,6 +7,27 @@
       "domain": "System Bus",
       "inventory_address": "0x08C6AC80",
       "inventory_length": 2960,
+      "event_work": {
+        "address": "0x08C7DAEC",
+        "length": 1284,
+        "block_id": 19,
+        "search_evidence": "/tmp/opencode/oras-save-pmlcj2zw/attempt-772ewrho",
+        "read_observations": [
+          "/tmp/opencode/oras-save-pmlcj2zw/attempt-178wch3s",
+          "/tmp/opencode/oras-save-ev5_8vq1/attempt-wwboxv66"
+        ],
+        "clock_scene_candidate": {
+          "work_index_decimal": 130,
+          "work_offset": "0x104",
+          "address": "0x08C7DBF0",
+          "type": "little-endian uint16",
+          "observed_before": 2,
+          "observed_after": 3,
+          "production_location_approved": false
+        },
+        "status": "Full-block reads validated; native clock/mother scene work[130] 2-to-3 saved and cold-reloaded. Later story states not yet validated.",
+        "write_allowed": false
+      },
       "write_allowed": false,
       "provenance": {
         "method": "Unique exact match of a CRC-validated inventory block in Encore's documented heap",

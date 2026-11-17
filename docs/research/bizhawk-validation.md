@@ -7,6 +7,8 @@ Statut au 17 novembre 2026 :
   variation Potion 1 → 0 et persistance native vérifiées ; inventaire via API AP,
   écriture gardée 1 → 2 et rechargement natif également vérifiés.
 - AS : aucune sauvegarde jouable ni variable de progression encore validée.
+- OR : candidat d'événement horloge/dialogue observé avec témoins négatifs
+  et rechargement ; permanence lors de la suite du scénario à vérifier.
 - Boucle serveur, index persistants et livraison idempotente : non validés.
 
 Historique des preuves :
@@ -18,6 +20,7 @@ Historique des preuves :
 - [006 — rechargement et inventaire statique](../reports/006-native-reload-and-inventory.md).
 - [007 — variation et persistance natives](../reports/007-native-quantity-and-persistence.md).
 - [008 — inventaire via AP et écriture gardée](../reports/008-connector-inventory-and-write.md).
+- [009 — candidat d'événement horloge/dialogue](../reports/009-native-clock-event-candidate.md).
 
 Une reconnexion de métadonnées ne suffit pas à valider la reprise des items
 ou des pointeurs exigée par BH-09. Sur OR, l'inventaire a aussi été recontrôlé
@@ -142,7 +145,7 @@ La matrice reste indépendante :
 
 | Configuration | Démarrage/sauvegarde | Lua/domaines | TCP métadonnées/reconnexion | Lecture variable | Écriture/persistance | Événement | E2E AP |
 |---|---|---|---|---|---|---|---|
-| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid ; quantité persistante | Inventaire validé | Validé | Lua et API AP ; avant/après reconnexion | Potion 1 → 2 gardée, 58 CRC, sac ×2 après redémarrage | Non testé | Non testé |
+| Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid ; quantité persistante | Inventaire validé | Validé | Lua et API AP ; avant/après reconnexion | Potion 1 → 2 gardée, 58 CRC, sac ×2 après redémarrage | Candidat horloge/dialogue, témoins et rechargement ; suite à vérifier | Non testé |
 | Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
 
 ## Politique de repli

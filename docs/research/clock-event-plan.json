@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "scope": "Native UI experiment only; no RAM writes or Archipelago IDs",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "initial_save_sha256": "7fe9813cf5ed377e67da4d9e279a69cd63efc697b1a07c3b6f9354a85896f465",
+  "speed_percent": 400,
+  "parts": {
+    "boot": "1800:-,2:A,600:-,2:A,600:-,2:A,600:-",
+    "enter_bedroom": "24:Left,80:Up,24:Right,60:Up,120:-",
+    "approach_clock_without_interaction": "50:Left,10:Right,20:Up,60:-",
+    "dialogue_pair": "2:A,180:-",
+    "dialogue_pair_repetitions": 16,
+    "native_save": "2:X,60:-,2:Down,20:-,2:A,60:-,2:A,600:-,2:A,120:-"
+  },
+  "sample_steps": [7, 12, 16, 30, 44, 48],
+  "sample_roles": {
+    "7": "Loaded baseline, before stairs",
+    "12": "Upstairs map entered, no clock interaction",
+    "16": "Near clock, no A interaction yet",
+    "30": "Clock/mother sequence still in progress",
+    "44": "Clock/mother sequence completed",
+    "48": "Additional A presses after sequence"
+  },
+  "warning": "Frame plans depend on initial position and UI state; inspect captures. Do not infer event completion from elapsed frames."
+}
