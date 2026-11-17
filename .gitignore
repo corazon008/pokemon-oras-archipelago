@@ -1,0 +1,19 @@
+# Personal game copies and local emulator data must not be distributed.
+/ROMs/
+/bin/
+/local/
+/dumps/
+*.3ds
+*.cci
+*.cia
+*.cxi
+*.nds
+*.gba
+*.sav
+*.state
+
+# Python development artifacts.
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/

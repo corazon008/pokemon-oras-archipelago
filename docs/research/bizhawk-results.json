@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-17",
+  "scope": "Boot to language selection and Lua capability inventory only.",
+  "environment": {
+    "platform": "Linux x86_64",
+    "bizhawk_version": "2.11.1",
+    "emuhawk_sha256": "f8cdb93551a544f680bf3876d9d8d72643859e7a44a23b04e1a25b92e48f80cd",
+    "libencore_sha256": "6aedffb3ecf7c5a05e971768d80639ea43776d633f6c4289ee41fc8d83c6788a",
+    "lua_version": "Lua 5.4",
+    "system_id_observed": "3DS",
+    "isolated_runtime": true,
+    "existing_3ds_profile_copied": false,
+    "new_3ds_mode": true,
+    "plugin_loader_enabled": false
+  },
+  "shared_observations": {
+    "domain_inventory_succeeded": true,
+    "domains_size_api_bytes": {
+      "FCRAM": 268435456,
+      "VRAM": 6291456,
+      "DSP RAM": 524288,
+      "N3DS Extra RAM": 4194304,
+      "System Bus": 0
+    },
+    "system_bus_zero_is_not_absence_of_domain": true,
+    "read_api_present_but_not_executed": true,
+    "write_api_present_but_not_executed": true,
+    "lua_socket_require_without_archipelago_dependencies": false,
+    "memory_reads_by_probe": 0,
+    "memory_writes_by_probe": 0
+  },
+  "runs": [
+    {
+      "edition_confirmed_on_screen": "Pokemon Alpha Sapphire",
+      "rom_sha256": "f349613532dbcc124b11373fc03ed7dbf2addb3c4ac7b15c8674a7628ebafab4",
+      "rom_size_bytes": 2147483648,
+      "local_evidence_directory": "/tmp/opencode/oras-bizhawk-eaxnwc1g",
+      "frame_start": 0,
+      "frame_end": 180,
+      "process_exit_code": 0,
+      "screen_observed": "Language selection",
+      "title_id": null,
+      "region_verified": false,
+      "game_revision_verified": false,
+      "installed_update_version": null,
+      "gameplay_validated": false,
+      "native_save_validated": false
+    },
+    {
+      "edition_confirmed_on_screen": "Pokemon Omega Ruby",
+      "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+      "rom_size_bytes": 2147483648,
+      "local_evidence_directory": "/tmp/opencode/oras-bizhawk-z0izyxkz",
+      "frame_start": 0,
+      "frame_end": 180,
+      "process_exit_code": 0,
+      "screen_observed": "Language selection",
+      "title_id": null,
+      "region_verified": false,
+      "game_revision_verified": false,
+      "installed_update_version": null,
+      "gameplay_validated": false,
+      "native_save_validated": false
+    }
+  ],
+  "not_validated": [
+    "Playable save and save/reload cycle",
+    "Concrete game variable read",
+    "Controlled memory write",
+    "Persistent item delivery",
+    "Archipelago generic connector TCP handshake",
+    "Location event detection",
+    "Archipelago end-to-end integration"
+  ]
+}
