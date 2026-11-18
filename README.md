@@ -13,7 +13,8 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 
 **18 novembre 2026 : incident de stockage.** Les profils et checkpoints sous
 `/tmp/opencode` ont disparu au reboot ; aucune copie durable du Pokédex n'avait
-été créée. Code et rapports conservés, mais partie de test à recréer.
+été créée. Code et rapports conservés ; une nouvelle partie de début de jeu
+a depuis été créée et sauvegardée durablement (rapport 015).
 Les nouveaux profils et snapshots sont stockés sous `local/oras/` (ignoré par Git).
 Voir le [rapport 014](docs/reports/014-reboot-loss-and-durable-profiles.md).
 
@@ -42,6 +43,14 @@ Résultats historiques du 17 novembre :
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
 - Sauvegarde OR jouable précédemment reçue ; copies temporaires perdues au reboot.
 
+Avancées du 18 novembre :
+
+- Nouvelle sauvegarde OR à Potion ×1 : 58 CRC, backups hors `/tmp`, rechargement
+  jouable et deux lectures API AP conformes ; aucun octet écrit.
+- Fondations [client hors ligne](oras_client/README.md) : `GameInterface`,
+  journal SQLite et suspension des livraisons incertaines, testés sur faux backend.
+- Aucun compteur atomique item/index vérifié dans ORAS : livraison live bloquée.
+
 ## Documents
 
 - [Audit comparatif initial](docs/research/audit-initial.md).
@@ -61,14 +70,14 @@ Résultats historiques du 17 novembre :
 - [Témoin avant réception du Pokédex — rapport 012](docs/reports/012-pokedex-before-checkpoint.md).
 - [Réception du Pokédex et persistance — rapport 013](docs/reports/013-pokedex-event-and-persistence.md).
 - [Perte au reboot et profils durables — rapport 014](docs/reports/014-reboot-loss-and-durable-profiles.md).
+- [Nouvelle sauvegarde durable — rapport 015](docs/reports/015-new-durable-save-verification.md).
+- [Fondations du client hors ligne — rapport 016](docs/reports/016-offline-delivery-foundations.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
-Développer `GameInterface` et le protocole de livraison persistant/dédoublonné,
-puis une boucle serveur minimale avec le candidat Pokédex et un consommable.
-Les tests live exigent d'abord une nouvelle sauvegarde jouable et la vérification
-de son snapshot durable.
+Vérifier une méthode d'application atomique item + index, puis leur persistance
+commune, avant de brancher l'interface client sur des écritures réelles.
 La boucle serveur et la livraison idempotente restent à développer ; l'essai
 de quantité ne les remplace pas.
 
