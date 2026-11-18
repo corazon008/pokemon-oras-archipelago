@@ -13,13 +13,13 @@ import tempfile
 from rom_identity import inspect_rom, sha256_file
 from oras_save import validate_save, inventory_bytes, inventory_entries, compare_medicine_change
 from oras_events import event_bytes, compare_events, EVENT_LENGTH
+from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
 
 
 BUTTONS = {"A", "B", "X", "Y", "Up", "Down", "Left", "Right", "L", "R", "Start", "Select"}
-TEMP_ROOT = Path("/tmp/opencode")
 
 
 def parse_steps(value: str) -> list[tuple[int, str]]:
@@ -188,11 +188,12 @@ def main() -> int:
     if identity["edition_from_program_id"] is None:
         parser.error("Only identified ORAS program IDs are supported")
     rom_hash = sha256_file(rom)
-    TEMP_ROOT.mkdir(parents=True, exist_ok=True)
+    PROFILE_ROOT.mkdir(parents=True, exist_ok=True, mode=0o700)
     if args.session:
-        session = args.session.resolve()
-        if not session.is_relative_to(TEMP_ROOT) or session == TEMP_ROOT:
-            parser.error("Reusable sessions must be private children of /tmp/opencode")
+        try:
+            session = validate_profile_path(args.session)
+        except ValueError as error:
+            parser.error(str(error))
         manifest = json.loads((session / "profile.json").read_text())
         if manifest.get("kind") != "oras_native_save_probe" or manifest.get("rom_sha256") != rom_hash:
             parser.error("Profile/ROM identity mismatch")
@@ -203,7 +204,7 @@ def main() -> int:
         config = isolate_config(json.loads(config_path.read_text()), runtime)
         config_path.write_text(json.dumps(config, indent=2) + "\n")
     else:
-        session = Path(tempfile.mkdtemp(prefix="oras-save-", dir=TEMP_ROOT))
+        session = Path(tempfile.mkdtemp(prefix="oras-save-", dir=PROFILE_ROOT))
         runtime = prepare_runtime(args.bizhawk.resolve(), session)
         manifest = {
             "kind": "oras_native_save_probe",
@@ -307,7 +308,16 @@ def main() -> int:
         "host_hidapi_disabled_for_automation": not args.interactive,
         "host_hidapi_disabled_for_keyboard_only": args.keyboard_only,
     }
+    target = save_destination(runtime, identity["program_id"])
+    try:
+        report["backup_before_launch"] = backup_existing_save(
+            target, identity["program_id"], rom_hash, "before-launch",
+        )
+    except (OSError, ValueError) as error:
+        parser.exit(1, f"Pre-launch save backup failed; emulator not started: {error}\n")
     print(f"Private save session: {session}\nAttempt: {attempt}", flush=True)
+    if report["backup_before_launch"]:
+        print(f"Durable save snapshot: {report['backup_before_launch']}", flush=True)
     with (attempt / "stdout.txt").open("w") as stdout, (attempt / "stderr.txt").open("w") as stderr:
         try:
             result = subprocess.run(
@@ -320,6 +330,17 @@ def main() -> int:
             )
         except subprocess.TimeoutExpired:
             report.update({"exit_code": None, "complete": False, "timed_out": True})
+        except KeyboardInterrupt:
+            report.update({"exit_code": None, "complete": False, "interrupted": True})
+    try:
+        report["backup_after_exit"] = backup_existing_save(
+            target, identity["program_id"], rom_hash, "after-exit",
+        )
+    except (OSError, ValueError) as error:
+        report.update({"complete": False, "backup_error": str(error)})
+        (attempt / "result.json").write_text(json.dumps(report, indent=2) + "\n")
+        print(json.dumps(report, indent=2))
+        return 1
     if manifest["seed_source"]:
         report["seed_source_unchanged"] = sha256(Path(manifest["seed_source"])) == manifest["seed_sha256"]
     if manifest.get("archive_metadata_source"):

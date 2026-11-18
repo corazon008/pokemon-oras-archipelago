@@ -27,6 +27,7 @@ from oras_connector_inventory import (
 from oras_save import inspect_save, inventory_bytes
 from oras_events import event_bytes
 from oras_connector_events import BOOT_GAMEPLAY_STEPS, EventReference, load_event_reference, read_events
+from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path
 
 
 REQUESTS = (
@@ -157,10 +158,7 @@ async def finish_native_ui(process, signal: Path, marker: Path, timeout: float) 
 
 def reuse_profile(path: Path, rom_hash: str) -> tuple[Path, dict]:
     """Reuse only a matching tool-created profile; never import another save."""
-    path = path.resolve()
-    temporary_root = Path("/tmp/opencode").resolve()
-    if not path.is_relative_to(temporary_root) or path == temporary_root:
-        raise ValueError("Reusable profiles must be private children of /tmp/opencode")
+    path = validate_profile_path(path)
     manifest = json.loads((path / "profile.json").read_text())
     if manifest.get("kind") != "oras_native_save_probe" or manifest.get("rom_sha256") != rom_hash:
         raise ValueError("Profile/ROM identity mismatch")
@@ -217,12 +215,13 @@ def main() -> int:
     if not mono:
         parser.error("Mono is not on PATH")
     require_free_ports()
-    temporary_root = Path("/tmp/opencode")
+    temporary_root = PROFILE_ROOT
     temporary_root.mkdir(parents=True, exist_ok=True)
     if args.session:
-        profile_path = args.session.resolve()
-        if not profile_path.is_relative_to(temporary_root) or profile_path == temporary_root:
-            parser.error("Reusable profiles must be private children of /tmp/opencode")
+        try:
+            profile_path = validate_profile_path(args.session)
+        except ValueError as error:
+            parser.error(str(error))
         session = Path(tempfile.mkdtemp(prefix="connector-attempt-", dir=profile_path))
     else:
         session = Path(tempfile.mkdtemp(prefix="oras-connector-", dir=temporary_root))
@@ -267,6 +266,10 @@ def main() -> int:
                 archive = seed_archive(args.seed_save, save_destination(runtime, identity["program_id"]))
                 report["archive"] = archive
             report["save_sha256_before_launch"] = sha256(save_destination(runtime, identity["program_id"]))
+            report["backup_before_launch"] = backup_existing_save(
+                save_destination(runtime, identity["program_id"]),
+                identity["program_id"], identity["rom_sha256"], "before-connector",
+            )
             report["scope"] = "TCP metadata, code and validated inventory reads, including reconnection"
             report["native_boot_steps"] = steps
             report["speed_percent"] = args.speed
@@ -383,6 +386,14 @@ def main() -> int:
             process.wait()
         if process is not None:
             report["exit_code"] = process.returncode
+            if has_profile:
+                try:
+                    report["backup_after_exit"] = backup_existing_save(
+                        save_destination(runtime, identity["program_id"]),
+                        identity["program_id"], identity["rom_sha256"], "after-connector",
+                    )
+                except (OSError, ValueError) as error:
+                    report.update({"status": "failed", "backup_error": str(error)})
         if archive is not None:
             for prefix in ("seed", "archive_metadata"):
                 if not archive.get(f"{prefix}_source"):

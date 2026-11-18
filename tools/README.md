@@ -1,8 +1,51 @@
 # Sondes BizHawk / Encore
 
 Ces outils inventorient les capacités de Lua et testent le transport AP.
-Ils ne constituent pas encore un client de jeu ORAS ni un test de lecture
-d'une variable de progression.
+Ils lisent aussi des variables ORAS documentées, mais ne constituent pas
+encore un client de jeu fonctionnel.
+
+## Sauvegardes persistantes — depuis le 18 novembre 2026
+
+**Les anciens profils `/tmp/opencode` ont été perdus au reboot.** Leurs hashes
+dans les rapports ne sont pas des backups et ne permettent pas une restauration.
+
+`run_bizhawk_save_probe.py` et `run_bizhawk_connector_probe.py` créent désormais
+leurs profils sous `local/oras/profiles/`. Les exemples `/tmp` ci-dessous et les
+anciens rapports décrivent le workflow historique : pour `--session`, utiliser
+maintenant le chemin persistant affiché au lancement.
+
+Les deux lanceurs publient automatiquement des copies CRC-validées avant le
+lancement et après fermeture sous `local/oras/backups/`. Chaque copie contient
+`00000001/main`, les métadonnées Encore et `snapshot.json`. Les `.partial-*`
+ne sont pas des backups publiés. En cas d'échec de backup, ne pas poursuivre
+les expériences avant d'avoir conservé le dernier fichier valide.
+
+```sh
+python3 tools/oras_profiles.py local/oras/backups/IDENTIFIANT
+```
+
+Les sauvegardes de jeu restent privées et ignorées par Git. Nextcloud peut les
+synchroniser : Git ignore n'est pas une protection contre une publication ou
+une suppression dans le cloud.
+
+Pour créer une nouvelle partie avec contrôles clavier :
+
+```sh
+python3 tools/run_bizhawk_save_probe.py --interactive --keyboard-only \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+```
+
+Sauvegarder via le menu natif, fermer, puis vérifier le chemin
+`backup_after_exit` dans le résultat. Reprendre avec `--session` et le chemin
+`local/oras/profiles/oras-save-...` affiché ; **ne pas recréer un nouveau profil
+à chaque reprise**.
+
+Restaurer une copie vérifiée vers un nouveau profil avec
+`--seed-save local/oras/backups/IDENTIFIANT/00000001/main`. Ne pas remplacer
+manuellement la sauvegarde d'un profil courant. Les snapshots ne conservent
+pas les changements restés uniquement en RAM et ne remplacent pas une copie
+sur un stockage indépendant. Voir le
+[rapport 014](../docs/reports/014-reboot-loss-and-durable-profiles.md).
 
 ## Exécution isolée
 
@@ -82,7 +125,7 @@ Ce diagnostic :
 - Vérifie une déconnexion/reconnexion et ferme sa propre instance via un signal
   fichier traité par le wrapper Lua.
 - Produit `result.json`, `stdout.txt` et `stderr.txt` sous
-  `/tmp/opencode/oras-connector-*`.
+  `local/oras/profiles/oras-connector-*`.
 
 Connexion Internet nécessaire pour ces téléchargements. Aucun paquet système
 ni dépendance Python externe n'est installé. Plateforme ciblée : Linux x86_64.
@@ -165,7 +208,7 @@ La macro suppose le contexte UI connu ; aucun détecteur général combat/menu
 n'existe. Le rechargement à froid reste une vérification distincte.
 
 Le dossier de réussite contient un `profile.json` compatible avec
-`run_bizhawk_save_probe.py --session /tmp/opencode/oras-connector-IDENTIFIANT`.
+`run_bizhawk_save_probe.py --session local/oras/profiles/oras-connector-IDENTIFIANT`.
 Pour revoir Médecine après redémarrage, utiliser les étapes de démarrage
 documentées dans le [rapport 008](../docs/reports/008-connector-inventory-and-write.md).
 Le JSON distingue soumission d'écriture, accusé réseau, relecture RAM et fichier
@@ -185,7 +228,7 @@ Cette commande ouvre une **nouvelle copie isolée** de BizHawk. Créer une parti
 atteindre un état jouable, sauvegarder depuis le menu natif et fermer proprement
 l'émulateur. Ne pas remplacer un fichier du répertoire `bin/` ou la ROM originale.
 
-Le terminal indique le dossier `/tmp/opencode/oras-save-*`. Le conserver pour
+Le terminal indique le dossier `local/oras/profiles/oras-save-*`. Le conserver pour
 les essais suivants : il contient le profil et sa sauvegarde de test.
 Le mode interactif n'a ni macro, ni fermeture automatique après délai.
 Une fermeture réussie de la fenêtre ne prouve pas à elle seule qu'une sauvegarde
@@ -198,7 +241,7 @@ relancer **le même profil**, sans réimporter :
 
 ```sh
 python3 tools/run_bizhawk_save_probe.py --interactive --keyboard-only \
-  --session /tmp/opencode/oras-save-IDENTIFIANT \
+  --session local/oras/profiles/oras-save-IDENTIFIANT \
   --rom "/chemin/vers/OR-verifie.3ds"
 ```
 
@@ -220,12 +263,12 @@ Pour reprendre ce même profil :
 
 ```sh
 python3 tools/run_bizhawk_save_probe.py --interactive \
-  --session /tmp/opencode/oras-save-IDENTIFIANT \
+  --session local/oras/profiles/oras-save-IDENTIFIANT \
   --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
 ```
 
-Les profils `/tmp` sont temporaires : ils peuvent disparaître après redémarrage
-ou nettoyage du système. Conserver une copie privée avant un essai important.
+Les anciens profils `/tmp` étaient temporaires ; ils ne sont plus le défaut
+pour les sauvegardes. Conserver profils persistants et snapshots privés.
 
 Le mode automatisé, sans `--interactive`, accepte par exemple :
 
@@ -278,7 +321,7 @@ Les modes mémoire sont **strictement en lecture**. L'adresse retenue pour OR
 est restreinte au build identifié ; elle n'autorise pas d'écriture et n'est
 pas transposée à AS. Le candidat du plugin Gen6 a échoué sur ce build.
 
-Le lanceur désactive HIDAPI dans les processus automatisés seulement, pour
+Le lanceur désactive HIDAPI dans les processus automatisés et le mode clavier explicite, pour
 contourner une exception SDL observée à la fermeture. Les entrées physiques
 des sessions interactives ne sont pas modifiées.
 Voir le [rapport 006](../docs/reports/006-native-reload-and-inventory.md).
@@ -327,7 +370,7 @@ python3 tools/oras_events.py /copie/avant/main /copie/apres/main
 ```sh
 python3 tools/run_bizhawk_connector_probe.py \
   --rom "/chemin/vers/OR-verifie.3ds" \
-  --session /tmp/opencode/oras-save-IDENTIFIANT \
+  --session local/oras/profiles/oras-save-IDENTIFIANT \
   --read-event-work --speed 400 --timeout 150
 ```
 

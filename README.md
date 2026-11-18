@@ -11,6 +11,14 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 
 ## État réel
 
+**18 novembre 2026 : incident de stockage.** Les profils et checkpoints sous
+`/tmp/opencode` ont disparu au reboot ; aucune copie durable du Pokédex n'avait
+été créée. Code et rapports conservés, mais partie de test à recréer.
+Les nouveaux profils et snapshots sont stockés sous `local/oras/` (ignoré par Git).
+Voir le [rapport 014](docs/reports/014-reboot-loss-and-durable-profiles.md).
+
+Résultats historiques du 17 novembre :
+
 - Première analyse statique d'Archipelago, Émeraude, Noir/Blanc et Gen6 CTRPF réalisée.
 - Domaines mémoire et API Lua d'Encore identifiés dans les sources de BizHawk 2.11.1.
 - Les deux jeux atteignent le menu de langue ; inventaire Lua des domaines validé.
@@ -32,7 +40,7 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
   Interface Pokédex fonctionnelle et relecture AP après reconnexion vérifiées.
 - Aucun flag de location, ID Archipelago ou patch ORAS approuvé.
 - Aucun APWorld ni client ORAS fonctionnel à ce stade.
-- Profil interactif isolé disponible ; sauvegarde OR jouable reçue et préservée.
+- Sauvegarde OR jouable précédemment reçue ; copies temporaires perdues au reboot.
 
 ## Documents
 
@@ -52,12 +60,15 @@ Ces transports restent des alternatives uniquement en cas de blocage démontré.
 - [Suite manuelle et lecture d'événement via AP — rapport 011](docs/reports/011-clock-event-follow-up-and-ap-read.md).
 - [Témoin avant réception du Pokédex — rapport 012](docs/reports/012-pokedex-before-checkpoint.md).
 - [Réception du Pokédex et persistance — rapport 013](docs/reports/013-pokedex-event-and-persistence.md).
+- [Perte au reboot et profils durables — rapport 014](docs/reports/014-reboot-loss-and-durable-profiles.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
 
 Développer `GameInterface` et le protocole de livraison persistant/dédoublonné,
 puis une boucle serveur minimale avec le candidat Pokédex et un consommable.
+Les tests live exigent d'abord une nouvelle sauvegarde jouable et la vérification
+de son snapshot durable.
 La boucle serveur et la livraison idempotente restent à développer ; l'essai
 de quantité ne les remplace pas.
 

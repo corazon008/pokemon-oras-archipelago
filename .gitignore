@@ -3,6 +3,9 @@
 /bin/
 /local/
 /dumps/
+# Additional protection for exported Encore save archives.
+**/00000001/main
+**/00000001.metadata
 *.3ds
 *.cci
 *.cia
