@@ -236,6 +236,7 @@ def main() -> int:
     parser.add_argument("--read-event-work", action="store_true", help="Read full EventWork plus bounded clock-scene candidate")
     parser.add_argument("--scan-save-objects", action="store_true", help="Read-only executable-derived block47 object search")
     parser.add_argument("--trace-save-manager", action="store_true", help="Read-only constructor-derived manager table and object headers")
+    parser.add_argument("--scan-save-references", action="store_true", help="Read-only heap references to the verified native save manager")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -258,6 +259,8 @@ def main() -> int:
     if args.seed_save and args.session:
         parser.error("--seed-save and --session are mutually exclusive")
     has_profile = bool(args.seed_save or args.session)
+    if args.scan_save_references:
+        args.trace_save_manager = True
     if args.trace_save_manager:
         args.scan_save_objects = True
     if args.scan_save_objects:
@@ -357,7 +360,7 @@ def main() -> int:
         env = emulator_environment(runtime, automated=True)
         for optional in ("ORAS_CONNECTOR_BOOT", "ORAS_CONNECTOR_POST_SCRIPT", "ORAS_CONNECTOR_OBJECT_SCRIPT",
                          "ORAS_CONNECTOR_STRICT_GUARD_SCRIPT", "ORAS_CONNECTOR_STRICT_GUARD_READY",
-                         "ORAS_OBJECT_MANAGER_TABLE"):
+                         "ORAS_OBJECT_MANAGER_TABLE", "ORAS_OBJECT_MANAGER_REFERENCES"):
             env.pop(optional, None)
         env.update({
             "ORAS_CONNECTOR_DIRECTORY": str(bundle),
@@ -409,6 +412,12 @@ def main() -> int:
             if args.trace_save_manager:
                 env["ORAS_OBJECT_MANAGER_TABLE"] = str(object_report["manager"]["predicted_table"])
                 report["save_objects"]["manager"]["analysis_sha256"] = sha256(PROJECT_ROOT / "tools/oras_save_manager.py")
+                if args.scan_save_references:
+                    env["ORAS_OBJECT_MANAGER_REFERENCES"] = "1"
+                    report["save_objects"]["manager"]["backrefs_requested"] = True
+                    report["save_objects"]["manager"]["record_referrers_requested"] = True
+                    report["save_objects"]["manager"]["references_analysis_sha256"] = sha256(
+                        PROJECT_ROOT / "tools/oras_save_references.py")
         if args.experimental_potion_1_to_2:
             post = session / "native-save"
             post.mkdir()
@@ -498,6 +507,9 @@ def main() -> int:
                     or manager["metadata_descriptors_matching_file_layout"] != 58
                     or not manager["metadata_payload_matches_saved_footer"]):
                 raise ValueError("Manager metadata or recognized sizes differ from the validated reference")
+            if args.scan_save_references:
+                from oras_save_references import inspect_reference_capture
+                manager["references"] = inspect_reference_capture(objects, rom, manager["predicted_base"])
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"

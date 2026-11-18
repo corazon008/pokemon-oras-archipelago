@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-18",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "expanded_code_sha256": "d587c98ac5c4dedacf9be4baf2d6b7d10169e6a63f8bc35b132002cc27bc1a37",
+  "save_sha256_unchanged": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "debugging_capability_scope": {
+    "bizhawk_commit": "bdddf4a58aa1a022afb11dc73294a81a5aa7bbd5",
+    "managed_encore_bridge_exposes_cpu_or_memory_execution_callbacks": false,
+    "runtime_instruction_breakpoints_validated": false,
+    "other_debugging_transports_ruled_out": false
+  },
+  "pointer_graph": {
+    "manager": "0x08C6A9A8",
+    "manager_references": ["0x08C6A770", "0x08CEDA80"],
+    "main_record_candidate": "0x08CEDA80",
+    "record_source_pointer": "0x08C6A9A8",
+    "record_size_offset": 8,
+    "record_size": 483328,
+    "record_utf16_path_offset": 16,
+    "record_path": "data:/main",
+    "record_reference": "0x08CDCFC4",
+    "untyped_prefix_candidate": "0x08CDCFB8",
+    "prefix_first_word_points_to": "0x08CDD008",
+    "backup_system_type_candidate": {
+      "context_address": "0x08CDD008",
+      "dispatch": "0x005DD3B4",
+      "static_type_name": "gfl::fs::BackupSystem",
+      "ownership_of_nearby_record_proven": false
+    },
+    "nearby_backup_file_type_candidate": {
+      "context_address": "0x08CEDA18",
+      "dispatch": "0x005DD2F0",
+      "static_type_name": "gfl::fs::BackupFile",
+      "same_allocation_as_record_proven": false
+    }
+  },
+  "static_serialization": {
+    "read_loop": "0x0045DACC",
+    "write_loop": "0x0045DC38",
+    "read_callers": ["0x00124D7C", "0x0045D3D4"],
+    "write_callers": ["0x00124E50", "0x00124F34", "0x0045D23C"],
+    "manager_entry_count": 59,
+    "alignment": 512,
+    "regular_offsets_matching_documented_layout": 58,
+    "block47_file_offset": "0x20600",
+    "metadata_file_offset": "0x75E00",
+    "metadata_native_payload_length": 488,
+    "metadata_native_size_provider": "0x004630C4",
+    "total_aligned_size": "0x76000",
+    "write_backend_method_load": "0x0045DD40",
+    "write_backend_slot": "0x48",
+    "write_backend_indirect_call": "0x0045DD4C",
+    "last_entry_argument_r3": 1,
+    "other_entries_argument_r3": 0,
+    "last_entry_flag_semantics_proven": false,
+    "size_helper_special_cases_block_ids": [56, 57],
+    "special_cases_applied_to_full_layout_comparison": false,
+    "native_methods_invoked_by_research_tools": false,
+    "instruction_execution_observed": false
+  },
+  "attempts": [
+    {
+      "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-y1myc1dt",
+      "scope": "Manager references and 320-byte contexts",
+      "status": "complete",
+      "lua_reads": 350,
+      "before_backup": "local/oras/backups/before-connector-84d6yq5o",
+      "after_backup": "local/oras/backups/after-connector-05lnn8x3"
+    },
+    {
+      "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-e0q6fcp3",
+      "scope": "Main-record referrer, 320-byte parent context",
+      "status": "complete",
+      "lua_reads": 479,
+      "before_backup": "local/oras/backups/before-connector-mhtkctgl",
+      "after_backup": "local/oras/backups/after-connector-f7kwto96"
+    },
+    {
+      "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-0btdata9",
+      "scope": "512-byte parent context and typed candidate inspection",
+      "status": "complete",
+      "lua_reads": 479,
+      "before_backup": "local/oras/backups/before-connector-ywtf8pdz",
+      "after_backup": "local/oras/backups/after-connector-oo15gvip"
+    }
+  ],
+  "each_attempt": {
+    "ap_reads_including_skipped": 10,
+    "guard_requests": 4,
+    "reads_skipped_by_guard": 2,
+    "full_block47_object_rechecks": 2,
+    "memory_writes": 0,
+    "native_save_actions": 0,
+    "save_unchanged": true,
+    "exit_code": 0
+  },
+  "native_save_operation_observed_this_phase": false,
+  "serialization_loop_execution_timing_verified": false,
+  "filesystem_commit_semantics_verified": false,
+  "item_and_index_crash_atomicity_verified": false,
+  "exclusive_ap_storage_verified": false,
+  "alpha_sapphire_serialization_verified": false,
+  "manual_gameplay_needed_for_current_research": false
+}

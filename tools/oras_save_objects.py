@@ -31,6 +31,17 @@ def load_object_observation(capture, report: dict) -> CodeReference:
         raise ValueError("Invalid object pattern trailer")
     reads = (capture / "read-requests.txt").read_text().splitlines()
     expected_reads = len(report["reference_ranges"]) + 128 + 1 + (61 if "manager" in report else 0)
+    if report.get("manager", {}).get("backrefs_requested"):
+        backrefs = (capture / "manager-backrefs.txt").read_text().splitlines()
+        if len(backrefs) > 16:
+            raise ValueError("Too many manager-reference contexts")
+        expected_reads += 128 + len(backrefs)
+        if report["manager"].get("record_referrers_requested"):
+            records = (capture / "save-records.txt").read_text().splitlines()
+            referrers = (capture / "save-record-referrers.txt").read_text().splitlines()
+            if len(records) > len(backrefs) or len(referrers) > 16 * len(records):
+                raise ValueError("Too many save-record contexts")
+            expected_reads += 128 * len(records) + len(referrers)
     if len(reads) != expected_reads:
         raise ValueError("Unexpected object-search read count")
     report.update({

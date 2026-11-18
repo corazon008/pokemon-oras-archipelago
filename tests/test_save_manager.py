@@ -97,17 +97,18 @@ def capture_fixture(path, mismatch=None):
 class ManagerCaptureTests(unittest.TestCase):
     def test_cli_requires_profile_and_refuses_potion_combination(self):
         root = Path(__file__).resolve().parents[1]
-        for options, message in (
-            ([], "requires a validated profile"),
-            (["--seed-save", "synthetic-main", "--experimental-potion-1-to-2"], "read-only"),
-        ):
-            result = subprocess.run(
-                [sys.executable, str(root / "tools/run_bizhawk_connector_probe.py"),
-                 "--rom", "synthetic.3ds", "--trace-save-manager", *options],
-                capture_output=True, text=True, timeout=10,
-            )
-            self.assertEqual(result.returncode, 2)
-            self.assertIn(message, result.stderr)
+        for flag in ("--trace-save-manager", "--scan-save-references"):
+            for options, message in (
+                ([], "requires a validated profile"),
+                (["--seed-save", "synthetic-main", "--experimental-potion-1-to-2"], "read-only"),
+            ):
+                result = subprocess.run(
+                    [sys.executable, str(root / "tools/run_bizhawk_connector_probe.py"),
+                     "--rom", "synthetic.3ds", flag, *options],
+                    capture_output=True, text=True, timeout=10,
+                )
+                self.assertEqual(result.returncode, 2)
+                self.assertIn(message, result.stderr)
 
     def inspect(self, mismatch=None, change=None):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:

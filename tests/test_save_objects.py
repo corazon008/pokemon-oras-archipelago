@@ -153,8 +153,11 @@ class LuaObjectProbeTests(unittest.TestCase):
                    "ORAS_OBJECT_PLAN": str(capture / "plan"),
                    "ORAS_OBJECT_SEARCH": str(ROOT / "tools/inventory_search.lua")}
             env.pop("ORAS_OBJECT_MANAGER_TABLE", None)
-            if mode == "manager":
+            if mode in ("manager", "references"):
                 env["ORAS_OBJECT_MANAGER_TABLE"] = str(0x08CDCC78)
+            env.pop("ORAS_OBJECT_MANAGER_REFERENCES", None)
+            if mode == "references":
+                env["ORAS_OBJECT_MANAGER_REFERENCES"] = "1"
             script = f"""
 local mode = {mode!r}
 local pattern = string.pack("<I4", 0x500030) .. string.rep("\\0", 2000)
@@ -168,7 +171,7 @@ memory = {{
    assert(domain == "System Bus")
    calls = calls + 1
    if address == 0x100000 then return mode == "reference" and "bad!" or "code" end
-   if mode == "manager" then
+   if mode == "manager" or mode == "references" then
      if address == 0x08CDCC78 - 0x722D0 then return string.pack("<I4I4", 0x500000, 0x08300000) end
      if address == 0x08CDCC78 then
        local t = {{}} for i=0,57 do t[#t+1] = string.pack("<I4", 0x08200000+i*4) end
@@ -186,12 +189,25 @@ memory = {{
        bytes = bytes:sub(1, first-address) .. pattern:sub(first-found+1, last-found) .. bytes:sub(last-address+1)
      end
    end
+   if mode == "references" and address <= 0x08400100 and address+length >= 0x08400104 then
+     local at = 0x08400100-address
+     bytes = bytes:sub(1, at) .. string.pack("<I4", 0x08CDCC78-0x722D0) .. bytes:sub(at+5)
+     if at+36 <= length then
+       local path = "" for char in ("data:/main"):gmatch(".") do path=path..char.."\\0" end
+       bytes = bytes:sub(1, at+8) .. string.pack("<I4", 0x76000) .. bytes:sub(at+13, at+16)
+               .. path .. bytes:sub(at+37)
+     end
+   end
+   if mode == "references" and address <= 0x08500120 and address+length >= 0x08500124 then
+     local at = 0x08500120-address
+     bytes = bytes:sub(1, at) .. string.pack("<I4", 0x08400100) .. bytes:sub(at+5)
+   end
    return bytes
  end,
  write_bytes_as_array=function() error("WRITE forbidden") end,
 }}
 local ok, err = pcall(dofile, {str(ROOT / 'tools/bizhawk_save_object_probe.lua')!r})
-if mode == "match" or mode == "empty" or mode == "manager" then assert(ok, tostring(err))
+if mode == "match" or mode == "empty" or mode == "manager" or mode == "references" then assert(ok, tostring(err))
 else assert(not ok, "Fault did not fail") end
 if mode == "domain" then assert(calls == 0) end
 if mode == "reference" then assert(calls == 1) end
@@ -201,10 +217,17 @@ print("OBJECT_FIXTURE_PASS")
                                     timeout=15, env=env)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             complete = (capture / "complete").exists()
-            if mode == "manager":
+            if mode in ("manager", "references"):
                 for name, size in (("manager-root.bin", 8), ("manager-table.bin", 232),
                                    ("manager-headers.bin", 232), ("manager-metadata.bin", 504)):
                     self.assertEqual((capture / name).stat().st_size, size)
+            if mode == "references":
+                self.assertEqual((capture / "manager-backrefs.txt").read_text(), "0x08400100 0x08400000 320\n")
+                self.assertEqual((capture / "manager-backref-01.bin").stat().st_size, 320)
+                self.assertEqual((capture / "save-records.txt").read_text(), "0x08400100\n")
+                self.assertEqual((capture / "save-record-referrers.txt").read_text(),
+                                 "0x08400100 0x08500120 0x08500020 512\n")
+                self.assertEqual((capture / "save-record-referrer-01.bin").stat().st_size, 512)
             matches = (capture / "matches.txt").read_text() if complete else None
             reads = (capture / "read-requests.txt").read_text().splitlines() if (capture / "read-requests.txt").exists() else []
             return complete, matches, reads
@@ -226,6 +249,12 @@ print("OBJECT_FIXTURE_PASS")
         self.assertTrue(complete)
         self.assertEqual(matches, "0x080FFFF4\n")
         self.assertEqual(len(reads), 191)
+
+    def test_manager_references_scanned_and_contexts_rechecked(self):
+        complete, matches, reads = self.run_probe("references")
+        self.assertTrue(complete)
+        self.assertEqual(matches, "0x080FFFF4\n")
+        self.assertEqual(len(reads), 449)
 
     def test_bad_references_domains_partial_reads_and_changed_object_abort(self):
         for mode in ("reference", "domain", "short", "changed"):

@@ -71,6 +71,50 @@ if manager_table then
     assert(metadata % 4 == 0 and metadata >= 0x08000000
            and metadata + 504 <= 0x10000000, "Invalid manager metadata pointer")
     capture_bytes("manager-metadata.bin", read(metadata, 504))
+    if os.getenv("ORAS_OBJECT_MANAGER_REFERENCES") == "1" then
+        local manager_base = table_address - 0x722D0
+        local references = search(read, 0x08000000, 0x10000000,
+                                  string.pack("<I4", manager_base), 0x100000)
+        local output = assert(io.open(capture .. "/manager-backrefs.txt", "w"))
+        local records = {}
+        local main_path = ""
+        for character in ("data:/main"):gmatch(".") do main_path = main_path .. character .. "\0" end
+        for index, address in ipairs(references) do
+            assert(address % 4 == 0, "Unaligned manager reference")
+            local start = math.max(0x08000000, address - 256)
+            local length = math.min(320, 0x10000000 - start)
+            local bytes = read(start, length)
+            assert(string.unpack("<I4", bytes, address-start+1) == manager_base,
+                   "Manager reference changed during scan")
+            capture_bytes(string.format("manager-backref-%02d.bin", index), bytes)
+            output:write(string.format("0x%08X 0x%08X %d\n", address, start, length))
+            local offset = address-start+1
+            if offset+35 <= #bytes and string.unpack("<I4", bytes, offset+8) == 0x76000
+               and bytes:sub(offset+16, offset+35) == main_path then
+                records[#records+1] = address
+            end
+        end
+        output:close()
+        local candidates = assert(io.open(capture .. "/save-records.txt", "w"))
+        local referrers = assert(io.open(capture .. "/save-record-referrers.txt", "w"))
+        local index = 0
+        for _, record in ipairs(records) do
+            candidates:write(string.format("0x%08X\n", record))
+            local matches = search(read, 0x08000000, 0x10000000, string.pack("<I4", record), 0x100000)
+            for _, address in ipairs(matches) do
+                assert(address % 4 == 0, "Unaligned save-record reference")
+                index = index + 1
+                local start = math.max(0x08000000, address - 256)
+                local length = math.min(512, 0x10000000 - start)
+                local bytes = read(start, length)
+                assert(string.unpack("<I4", bytes, address-start+1) == record,
+                       "Save-record reference changed during scan")
+                capture_bytes(string.format("save-record-referrer-%02d.bin", index), bytes)
+                referrers:write(string.format("0x%08X 0x%08X 0x%08X %d\n", record, address, start, length))
+            end
+        end
+        candidates:close(); referrers:close()
+    end
 end
 journal:close()
 local output = assert(io.open(capture .. "/matches.txt", "w"))

@@ -219,6 +219,34 @@ référence ; une divergence échoue. Un provider contenant des appels reste
 non reconnu plutôt qu'exécuté. Les captures `objects/manager-*.bin` sont privées.
 Voir le [rapport 019](../docs/reports/019-native-save-manager.md).
 
+### Références du fichier et sérialisation
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --session local/oras/profiles/oras-save-kkvwuxa5 \
+  --scan-save-references --speed 400 --timeout 240
+
+python3 tools/oras_save_serialization.py \
+  "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+```
+
+Le scan implique le contrôle du manager et les gardes strictes. Il recherche
+les références du manager dans le heap, relit des contextes de 320 octets,
+sélectionne le record à taille/chemin exacts, puis recherche ses referrers
+avec contextes de 512 octets. Les pointeurs doivent encore correspondre lors
+de la capture. Ambiguïté excessive, référence ou longueur invalide : échec.
+
+Les types trouvés dans les contextes restent des candidats : proximité n'est
+pas propriété. Les binaires `manager-backref-*` et `save-record-referrer-*`
+sont privés, non distribuables. Leur journal de lectures est compté séparément
+des requêtes AP.
+
+Le second outil analyse seulement l'exécutable en mémoire : syntaxe de huit
+appels indirects, branches vers les boucles et reconstruction du layout aligné.
+Ni SAVE, ni méthode native, ni callback d'exécution n'est déclenché par ces
+outils. Voir le [rapport 020](../docs/reports/020-save-records-and-serialization.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

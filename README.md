@@ -58,6 +58,9 @@ Avancées du 18 novembre :
 - Manager natif OR corroboré : 58 blocs réguliers + métadonnées, 54 offsets
   prédits concordants, footer et CRC identiques. Reset/CRC repérés statiquement,
   pas leur calendrier d'exécution ni une transaction item/index.
+- Record `data:/main` relié au manager, candidats BackupFile/BackupSystem et
+  boucles de transfert repérés ; layout complet reproduit statiquement.
+  Aucun SAVE déclenché dans cette phase, aucune atomicité démontrée.
 
 ## Documents
 
@@ -83,6 +86,7 @@ Avancées du 18 novembre :
 - [Recherche de stockage et gardes strictes — rapport 017](docs/reports/017-ledger-storage-and-strict-guards.md).
 - [Exécutable et objets de sauvegarde — rapport 018](docs/reports/018-executable-and-save-objects.md).
 - [Manager natif de sauvegarde — rapport 019](docs/reports/019-native-save-manager.md).
+- [Records de fichier et sérialisation — rapport 020](docs/reports/020-save-records-and-serialization.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
