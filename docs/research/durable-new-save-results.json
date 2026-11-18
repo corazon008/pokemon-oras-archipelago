@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-18",
+  "scope": "New early-game save, not recovery of yesterday's lost save",
+  "program_id": "000400000011C400",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "profile": "local/oras/profiles/oras-save-kkvwuxa5",
+  "manual_attempt": "local/oras/profiles/oras-save-kkvwuxa5/attempt-8ht4n1b7",
+  "save_sha256": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "metadata_sha256": "24bb7e7f2835b4a0306d8ef31cb0ff1a37776ee7e8a591efe71e1046c78c4499",
+  "validated_crc_blocks": 58,
+  "verified_backups": [
+    "local/oras/backups/after-exit-72633fon",
+    "local/oras/backups/before-connector-qqb6_n_g",
+    "local/oras/backups/after-connector-uz_l_tk1"
+  ],
+  "all_backups_match_current_save_and_metadata": true,
+  "read_only_reload": {
+    "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-xdsx10tv",
+    "capture": "boot/step-07.png",
+    "observed_position": "Player's home, downstairs",
+    "connections": 2,
+    "memory_read_requests": 6,
+    "memory_write_requests": 0,
+    "inventory_and_event_blocks_match_validated_save": true,
+    "potion_quantities": [1, 1],
+    "pokedex_flag_values": [false, false],
+    "clock_work_130_values": [2, 2],
+    "save_unchanged": true,
+    "exit_code": 0
+  },
+  "actual_reboot_after_new_backup_tested": false,
+  "old_pokedex_save_recovered": false,
+  "ap_server_delivery_tested": false
+}
