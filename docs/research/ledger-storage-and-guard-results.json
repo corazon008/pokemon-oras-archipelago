@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-18",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "save_sha256_unchanged": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "save_reference": "local/oras/backups/after-exit-72633fon/00000001/main",
+  "storage_candidate": {
+    "source": "kwsch/PKHeX@6c9583883c7551ac74a4b74180cead249d4277b8/PKHeX.Core/Saves/Access/SaveBlockAccessor6AO.cs",
+    "block_id": 47,
+    "source_comment": "Unused (lmao)",
+    "save_file_offset": "0x20600",
+    "length": 2000,
+    "covered_by_validated_block_crc": true,
+    "nonzero_bytes_in_reference": 0,
+    "unique_ram_address": null,
+    "native_ownership_proven": false,
+    "native_write_lifecycle_proven": false,
+    "safe_to_allocate_for_ap": false,
+    "counter_installed": false
+  },
+  "upstream_dispatcher_test": {
+    "ap_commit": "cf08efe5b1c132bf966ae810c007b8268d47b7b0",
+    "memory_backend": "Synthetic test functions; no emulator",
+    "mock_write_calls_without_shim": 3,
+    "mock_write_calls_with_shim": 0,
+    "faults": ["read exception", "short read", "decode exception"],
+    "real_game_write_requests": 0
+  },
+  "first_runtime_attempt": {
+    "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-105mc67f",
+    "status": "failed",
+    "observed_cause": "BizHawk resolved unknown domain to current domain; an explicit name/range validator was missing",
+    "memory_read_requests": 4,
+    "memory_guard_requests": 2,
+    "memory_write_requests": 0,
+    "process_exit_code": 0,
+    "classified_as_success": false
+  },
+  "corrected_runtime_attempt": {
+    "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-_yveml1n",
+    "status": "complete",
+    "strict_guard_ready_before_connection": true,
+    "connections": 2,
+    "matching_code_guard_passed_each_connection": true,
+    "unknown_domain_guard_failed_each_connection": true,
+    "following_read_skipped_each_connection": true,
+    "memory_read_requests_including_skipped": 8,
+    "read_requests_blocked_by_guard": 2,
+    "memory_guard_requests": 4,
+    "memory_write_requests": 0,
+    "save_unchanged": true,
+    "exit_code": 0,
+    "before_backup": "local/oras/backups/before-connector-z55323zj",
+    "after_backup": "local/oras/backups/after-connector-uk430mc8"
+  },
+  "live_memory_read_exception_injected": false,
+  "live_item_delivery_validated": false,
+  "atomic_item_and_counter_save_validated": false,
+  "ownership_of_zero_filled_regions_assumed": false
+}

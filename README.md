@@ -50,6 +50,8 @@ Avancées du 18 novembre :
 - Fondations [client hors ligne](oras_client/README.md) : `GameInterface`,
   journal SQLite et suspension des livraisons incertaines, testés sur faux backend.
 - Aucun compteur atomique item/index vérifié dans ORAS : livraison live bloquée.
+- Shim GUARD strict : erreurs et domaines invalides refusés ; contrôle réel
+  sans écriture après reconnexion. Le bloc 47 « Unused » n'est pas réservé à AP.
 
 ## Documents
 
@@ -72,6 +74,7 @@ Avancées du 18 novembre :
 - [Perte au reboot et profils durables — rapport 014](docs/reports/014-reboot-loss-and-durable-profiles.md).
 - [Nouvelle sauvegarde durable — rapport 015](docs/reports/015-new-durable-save-verification.md).
 - [Fondations du client hors ligne — rapport 016](docs/reports/016-offline-delivery-foundations.md).
+- [Recherche de stockage et gardes strictes — rapport 017](docs/reports/017-ledger-storage-and-strict-guards.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

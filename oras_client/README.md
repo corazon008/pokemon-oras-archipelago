@@ -58,9 +58,12 @@ Before implementing `apply`, prove all of the following on the exact build:
 6. Persistence proof tied to the currently loaded state, not a stale disk file.
 7. Guard exceptions cannot accidentally execute a following WRITE.
 
-The existing upstream GUARD handler's exception behavior remains a known
-limitation (report 008). PC-side SQLite alone does not close the crash window
-between changing the game and recording an acknowledgment.
+The upstream GUARD handler's exception behavior is a known limitation (report
+008). The [strict research shim](../docs/reports/017-ledger-storage-and-strict-guards.md)
+now rejects errors, partial reads and domain/range fallback; the Potion probe
+requires it. It is still **not** a transaction across multiple WRITE requests.
+PC-side SQLite alone does not close the crash window between changing the game
+and recording an acknowledgment.
 
 Without a verified game-side counter, `next_delivery_index` must be `None`.
 The coordinator then refuses to submit anything. Potion quantity cannot stand

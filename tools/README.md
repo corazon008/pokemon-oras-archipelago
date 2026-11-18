@@ -143,6 +143,24 @@ sans redirection de port et sur une machine de confiance.
 Ces échanges ne sont pas le protocole WebSocket du serveur Archipelago.
 Voir le [rapport 003](../docs/reports/003-bizhawk-tcp.md).
 
+### Gardes strictes
+
+Ajouter `--strict-guards` avec `--read-code` ou un profil validé pour tester
+des gardes en lecture seule. Le wrapper remplace volontairement le handler
+GUARD, sans éditer les fichiers amont téléchargés.
+
+Il exige le domaine exact, un intervalle valide et 1..65 536 octets complets ;
+exception ou échec devient une garde fausse qui bloque la suite du lot.
+Python attend son marqueur d'installation avant connexion. Les tests réels
+ajoutent une garde valide et une garde de domaine absent suivie d'un READ sauté,
+sur chaque connexion. Les compteurs READ incluent les demandes sautées, indiquées
+séparément. Aucun WRITE n'est nécessaire pour ce test.
+
+L'option d'écriture Potion active obligatoirement ce shim. Celui-ci ne réserve
+pas d'espace AP, ne garantit pas le mapping des pages et ne rend pas plusieurs
+écritures transactionnelles. Ne pas le confondre avec un protocole de livraison.
+Voir le [rapport 017](../docs/reports/017-ledger-storage-and-strict-guards.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

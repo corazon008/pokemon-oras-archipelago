@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import hashlib
 import json
 import math
@@ -83,7 +84,8 @@ async def exercise_connector(api, process, timeout: float,
                               audit: dict | None = None,
                               inventory_reference: InventoryReference | None = None,
                               potion_rom_hash: str | None = None,
-                              event_reference: EventReference | None = None) -> list[dict]:
+                              event_reference: EventReference | None = None,
+                              strict_ready: Path | None = None) -> list[dict]:
     if event_reference is not None and (code_reference is None or audit is None):
         raise ValueError("Event reads require a runtime code guard and audit")
     if potion_rom_hash is not None:
@@ -96,6 +98,16 @@ async def exercise_connector(api, process, timeout: float,
     context = api.BizHawkContext()
     deadline = asyncio.get_running_loop().time() + timeout
     try:
+        if strict_ready is not None:
+            if code_reference is None or audit is None:
+                raise ValueError("Strict guard tests require code reference and audit")
+            while not strict_ready.exists():
+                if process.poll() is not None:
+                    raise RuntimeError("EmuHawk exited before strict GUARD installation")
+                if asyncio.get_running_loop().time() >= deadline:
+                    raise TimeoutError("Strict GUARD installation timed out")
+                await asyncio.sleep(0.1)
+            audit["strict_guard_ready"] = True
         for attempt in range(3 if potion_rom_hash else 2):
             await connect_until_ready(api, context, process, deadline)
             version = await api.get_script_version(context)
@@ -131,6 +143,8 @@ async def exercise_connector(api, process, timeout: float,
                 exchange["inventory_read"] = await read_inventory(api, context, inventory_reference, audit)
             if event_reference is not None:
                 exchange["event_read"] = await read_events(api, context, event_reference, audit)
+            if strict_ready is not None:
+                exchange["strict_guard_test"] = await test_strict_guard(api, context, code_reference, audit)
             if potion_rom_hash is not None and attempt == 1:
                 inventory_reference = await add_experimental_potion(
                     api, context, potion_rom_hash, code_reference, inventory_reference, audit,
@@ -142,6 +156,29 @@ async def exercise_connector(api, process, timeout: float,
     finally:
         api.disconnect(context)
     return exchanges
+
+
+async def test_strict_guard(api, context, code: CodeReference, audit: dict) -> dict:
+    """Read-only: valid guard, then invalid-domain guard followed by a skipped READ."""
+    request = {
+        "type": "GUARD", "address": code.address, "domain": "System Bus",
+        "expected_data": base64.b64encode(code.expected).decode("ascii"),
+    }
+    audit["memory_guard_requests"] = audit.get("memory_guard_requests", 0) + 1
+    valid = await api.send_requests(context, [request])
+    if valid != [{"type": "GUARD_RESPONSE", "address": code.address, "value": True}]:
+        raise ValueError("Strict GUARD rejected known matching code")
+    audit["memory_guard_requests"] += 1
+    audit["memory_read_requests"] += 1  # Submitted READ, expected to be skipped by failed guard.
+    blocked = await api.send_requests(context, [
+        {**request, "domain": "ORAS_TEST_ABSENT_DOMAIN"},
+        {"type": "READ", "address": code.address, "size": len(code.expected), "domain": "System Bus"},
+    ])
+    expected = {"type": "GUARD_RESPONSE", "address": code.address, "value": False}
+    if blocked != [expected, expected]:
+        raise ValueError("Failed strict GUARD did not skip the following READ")
+    audit["read_requests_blocked_by_guard"] = audit.get("read_requests_blocked_by_guard", 0) + 1
+    return {"matching_code_accepted": True, "invalid_domain_failed_closed": True, "following_read_skipped": True}
 
 
 async def finish_native_ui(process, signal: Path, marker: Path, timeout: float) -> None:
@@ -180,6 +217,7 @@ def main() -> int:
     parser.add_argument("--read-event-work", action="store_true", help="Read full EventWork plus bounded clock-scene candidate")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
+    parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
     parser.add_argument(
         "--experimental-potion-1-to-2", action="store_true",
         help="One guarded 2-byte write in a fresh seeded copy, then native save; never an AP delivery",
@@ -205,6 +243,9 @@ def main() -> int:
         parser.error("Event probes are read-only; do not combine with the Potion experiment")
     if args.experimental_potion_1_to_2 and not args.seed_save:
         parser.error("--experimental-potion-1-to-2 requires --seed-save (fresh private copy)")
+    strict_guards = args.strict_guards or args.experimental_potion_1_to_2
+    if strict_guards and not (args.read_code or has_profile):
+        parser.error("--strict-guards requires --read-code or a validated profile")
     try:
         steps = parse_steps(args.steps or (BOOT_GAMEPLAY_STEPS if args.read_event_work else BOOT_MEDICINE_STEPS))
     except ValueError as error:
@@ -234,6 +275,7 @@ def main() -> int:
         "memory_write_requests": 0,
         "existing_3ds_profile_copied": False,
         "rom": str(rom),
+        "strict_guards_enabled": strict_guards,
     }
     process = None
     archive = None
@@ -285,11 +327,23 @@ def main() -> int:
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
         env = emulator_environment(runtime, automated=True)
+        for optional in ("ORAS_CONNECTOR_BOOT", "ORAS_CONNECTOR_POST_SCRIPT",
+                         "ORAS_CONNECTOR_STRICT_GUARD_SCRIPT", "ORAS_CONNECTOR_STRICT_GUARD_READY"):
+            env.pop(optional, None)
         env.update({
             "ORAS_CONNECTOR_DIRECTORY": str(bundle),
             "ORAS_CONNECTOR_STOP": str(stop_file),
             "ORAS_CONNECTOR_TIMEOUT": str(math.ceil(args.timeout) + 10),
         })
+        strict_ready = None
+        if strict_guards:
+            strict_ready = session / "strict-guard-ready"
+            strict_script = PROJECT_ROOT / "tools/strict_bizhawk_guard.lua"
+            env.update({
+                "ORAS_CONNECTOR_STRICT_GUARD_SCRIPT": str(strict_script),
+                "ORAS_CONNECTOR_STRICT_GUARD_READY": str(strict_ready),
+            })
+            report["strict_guard_sha256"] = sha256(strict_script)
         if has_profile:
             capture = session / "boot"
             capture.mkdir()
@@ -332,6 +386,7 @@ def main() -> int:
                             api, process, args.timeout, code_reference, report, inventory_reference,
                             identity["rom_sha256"] if args.experimental_potion_1_to_2 else None,
                             event_reference,
+                            strict_ready,
                         ),
                         timeout=args.timeout,
                     )
