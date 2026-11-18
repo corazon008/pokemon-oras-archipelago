@@ -153,6 +153,17 @@ La matrice reste indépendante :
 | Rubis Oméga — SHA-256 documenté | Partie OR rechargée à froid ; quantité persistante | Inventaire validé | Validé | Lua et API AP ; avant/après reconnexion | Potion 1 → 2 gardée, 58 CRC, sac ×2 après redémarrage | Pokédex 2722 faux → vrai, UI, sauvegarde/rechargement et API AP | Non testé |
 | Saphir Alpha — build à identifier | Menu de langue ; sauvegarde non testée | Inventaire validé | Validé | Non testé | Non testé | Non testé | Non testé |
 
+## Stockage du compteur — état au 18 novembre 2026
+
+Le [rapport 018](../reports/018-executable-and-save-objects.md) localise un objet
+candidat du bloc 47 par dispatch non nul + payload de sauvegarde, sur deux boots
+OR à froid ; relecture complète AP avant/après reconnexion, aucune écriture.
+Le nom statique `savedata::ReservedSaveData` ne signifie pas « disponible pour AP ».
+La liaison de sérialisation, les resets et la persistance d'un contenu non nul
+restent à tracer. Aucune transaction item/index ni livraison live approuvée.
+Les preuves historiques d'écriture/Pokédex du tableau ne sont pas réexécutées
+sur le nouveau profil de début de jeu.
+
 ## Politique de repli
 
 Ne pas abandonner BizHawk sur un seul échec de configuration.

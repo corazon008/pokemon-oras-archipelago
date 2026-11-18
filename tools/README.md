@@ -161,6 +161,36 @@ pas d'espace AP, ne garantit pas le mapping des pages et ne rend pas plusieurs
 écritures transactionnelles. Ne pas le confondre avec un protocole de livraison.
 Voir le [rapport 017](../docs/reports/017-ledger-storage-and-strict-guards.md).
 
+## Analyse d'exécutable et recherche d'objets
+
+```sh
+python3 tools/oras_code_research.py \
+  "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --session local/oras/profiles/oras-save-kkvwuxa5 \
+  --scan-save-objects --speed 400 --timeout 240
+```
+
+La première commande décompresse `.code` en mémoire et publie seulement des
+métadonnées : mapping ExHeader, hash, candidats de tableaux et providers A32
+bornés. Elle n'extrait pas l'exécutable complet et ne prouve pas les limites
+de fonctions ou l'absence de tables sous d'autres formes.
+
+`--scan-save-objects` exige un profil validé et le build OR exact. Elle implique
+EventWork et les gardes strictes, et refuse l'expérience d'écriture Potion.
+Le plan privé impose un dispatch statique unique pour chaque bloc sélectionné,
+vérifie les références et en-têtes connus, puis recherche l'objet candidat du
+bloc 47 dans le heap documenté. Une correspondance unique est relue, puis
+contrôlée via AP avant/après reconnexion. Zéro commande d'écriture.
+
+`objects/references.bin` contient des références ROM et le payload de sauvegarde :
+**privé, ignoré par Git, non distribuable**. `read-requests.txt` journalise les
+lectures Lua séparément des requêtes AP. Les adresses sont des candidats en
+lecture seule, pas du stockage approuvé pour AP.
+Voir le [rapport 018](../docs/reports/018-executable-and-save-objects.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

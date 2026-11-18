@@ -49,6 +49,24 @@
         "write_allowed": false
       },
       "write_allowed": false,
+      "save_object_research": {
+        "report": "docs/reports/018-executable-and-save-objects.md",
+        "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-95bt79jr",
+        "inventory_dispatch": "0x005E09C4",
+        "event_work_dispatch": "0x005DF40C",
+        "block47": {
+          "dispatch": "0x005E074C",
+          "object_address": "0x08C88034",
+          "payload_address": "0x08C88038",
+          "payload_length": 2000,
+          "observed_cold_process_starts": 2,
+          "ap_full_object_rechecks": 2,
+          "static_type_name": "savedata::ReservedSaveData",
+          "serialization_link_proven": false,
+          "ap_ownership_proven": false,
+          "write_allowed": false
+        }
+      },
       "provenance": {
         "method": "Unique exact match of a CRC-validated inventory block in Encore's documented heap",
         "local_evidence": "/tmp/opencode/oras-save-1dqaca6j/attempt-zq1wp15p",

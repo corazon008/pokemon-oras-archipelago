@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import run_bizhawk_connector_probe as probe
@@ -69,6 +70,63 @@ class StrictProtocolTests(unittest.TestCase):
                     {"memory_read_requests": 0, "memory_write_requests": 0},
                     strict_ready=Path(directory) / "missing-ready",
                 ))
+
+    def object_exchange(self, changed=False):
+        class Writer:
+            async def wait_closed(self):
+                pass
+
+        class API:
+            class BizHawkContext:
+                _port = 43055
+                streams = (None, Writer())
+
+            async def get_script_version(self, context):
+                return 1
+
+            async def send_requests(self, context, requests):
+                if requests != list(probe.REQUESTS):
+                    raise AssertionError("Unexpected metadata requests")
+                return [
+                    {"type": "PONG"}, {"type": "SYSTEM_RESPONSE", "value": "3DS"},
+                    {"type": "MEMORY_SIZE_RESPONSE", "value": 268435456},
+                    {"type": "MEMORY_SIZE_RESPONSE", "value": 0},
+                ]
+
+            async def read(self, context, requests):
+                address, size, domain = requests[0]
+                if address == 0x100000:
+                    return [bytes(64)]
+                assert (address, size, domain) == (0x08004000, 2004, "System Bus")
+                return [bytes(2004) if not changed else b"x" * 2004]
+
+            def disconnect(self, context):
+                pass
+
+        audit = {"memory_read_requests": 0, "memory_write_requests": 0, "save_objects": {}}
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            ready = Path(directory) / "ready"
+            ready.touch()
+            with patch.object(probe, "connect_until_ready", new=AsyncMock()), \
+                    patch.object(probe, "test_strict_guard", new=AsyncMock(return_value={})), \
+                    patch("oras_save_objects.load_object_observation",
+                          return_value=CodeReference(0x08004000, bytes(2004))):
+                exchanges = asyncio.run(probe.exercise_connector(
+                    API(), None, 1, CodeReference(0x100000, bytes(64)), audit,
+                    strict_ready=ready, object_capture=Path(directory),
+                ))
+        return exchanges, audit
+
+    def test_full_object_rechecked_across_two_connections(self):
+        exchanges, audit = self.object_exchange()
+        self.assertEqual(len(exchanges), 2)
+        self.assertTrue(all(row["save_object_read"]["matches_private_plan"] for row in exchanges))
+        self.assertEqual(audit["memory_read_requests"], 4)
+        self.assertEqual(audit["memory_write_requests"], 0)
+
+    def test_changed_object_aborts_connection(self):
+        with self.assertRaisesRegex(ValueError, "Save-object bytes changed"):
+            self.object_exchange(changed=True)
 
 
 if __name__ == "__main__":

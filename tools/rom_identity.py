@@ -140,6 +140,17 @@ def inspect_rom(path: Path) -> tuple[dict, CodeReference | None]:
             if code_size + extra_size > 64 * 1024 * 1024:
                 raise ValueError("Implausible expanded code size")
         info["code_stored_size_bytes"] = code_size
+        info["code_file_offset_bytes"] = code_start
+        info["code_segments"] = []
+        packed_offset = 0
+        for name, header_offset in (("text", 0x10), ("ro", 0x20), ("data", 0x30)):
+            address, pages, length = struct.unpack_from("<III", exheader, header_offset)
+            info["code_segments"].append({
+                "name": name, "address": address, "pages": pages,
+                "size": length, "image_offset": packed_offset,
+            })
+            packed_offset += pages * 0x1000
+        info["bss_size_bytes"] = struct.unpack_from("<I", exheader, 0x3C)[0]
         info["code_uncompressed_prefix_size_bytes"] = prefix_size
         if prefix_size < PREFIX_SIZE:
             info["code_reference_unavailable_reason"] = "Compressed suffix overlaps the reference"

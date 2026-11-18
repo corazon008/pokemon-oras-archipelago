@@ -85,9 +85,12 @@ async def exercise_connector(api, process, timeout: float,
                               inventory_reference: InventoryReference | None = None,
                               potion_rom_hash: str | None = None,
                               event_reference: EventReference | None = None,
-                              strict_ready: Path | None = None) -> list[dict]:
+                              strict_ready: Path | None = None,
+                              object_capture: Path | None = None) -> list[dict]:
     if event_reference is not None and (code_reference is None or audit is None):
         raise ValueError("Event reads require a runtime code guard and audit")
+    if object_capture is not None and (strict_ready is None or audit is None):
+        raise ValueError("Object rechecks require strict readiness and audit")
     if potion_rom_hash is not None:
         if code_reference is None or inventory_reference is None or audit is None:
             raise ValueError("Potion experiment requires code, inventory and audit")
@@ -108,6 +111,10 @@ async def exercise_connector(api, process, timeout: float,
                     raise TimeoutError("Strict GUARD installation timed out")
                 await asyncio.sleep(0.1)
             audit["strict_guard_ready"] = True
+        object_reference = None
+        if object_capture is not None:
+            from oras_save_objects import load_object_observation
+            object_reference = load_object_observation(object_capture, audit["save_objects"])
         for attempt in range(3 if potion_rom_hash else 2):
             await connect_until_ready(api, context, process, deadline)
             version = await api.get_script_version(context)
@@ -136,6 +143,18 @@ async def exercise_connector(api, process, timeout: float,
                     "length": len(payloads[0]),
                     "sha256": hashlib.sha256(payloads[0]).hexdigest(),
                     "matches_rom_prefix": True,
+                }
+            if object_reference is not None:
+                audit["memory_read_requests"] += 1
+                payloads = await api.read(context, [
+                    (object_reference.address, len(object_reference.expected), "System Bus"),
+                ])
+                if len(payloads) != 1 or payloads[0] != object_reference.expected:
+                    raise ValueError("Save-object bytes changed before/after AP reconnect")
+                exchange["save_object_read"] = {
+                    "address": f"0x{object_reference.address:08X}",
+                    "length": len(payloads[0]), "matches_private_plan": True,
+                    "sha256": hashlib.sha256(payloads[0]).hexdigest(),
                 }
             if inventory_reference is not None:
                 if code_reference is None or audit is None:
@@ -215,6 +234,7 @@ def main() -> int:
     parser.add_argument("--seed-save", type=Path, help="Copy a validated save/archive; read inventory after native boot")
     parser.add_argument("--session", type=Path, help="Reuse an identified tool-created profile for read-only probes")
     parser.add_argument("--read-event-work", action="store_true", help="Read full EventWork plus bounded clock-scene candidate")
+    parser.add_argument("--scan-save-objects", action="store_true", help="Read-only executable-derived block47 object search")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -237,6 +257,11 @@ def main() -> int:
     if args.seed_save and args.session:
         parser.error("--seed-save and --session are mutually exclusive")
     has_profile = bool(args.seed_save or args.session)
+    if args.scan_save_objects:
+        if not has_profile:
+            parser.error("--scan-save-objects requires a validated profile")
+        args.read_event_work = True
+        args.strict_guards = True
     if args.read_event_work and not has_profile:
         parser.error("--read-event-work requires --seed-save or --session")
     if args.read_event_work and args.experimental_potion_1_to_2:
@@ -327,7 +352,7 @@ def main() -> int:
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
         env = emulator_environment(runtime, automated=True)
-        for optional in ("ORAS_CONNECTOR_BOOT", "ORAS_CONNECTOR_POST_SCRIPT",
+        for optional in ("ORAS_CONNECTOR_BOOT", "ORAS_CONNECTOR_POST_SCRIPT", "ORAS_CONNECTOR_OBJECT_SCRIPT",
                          "ORAS_CONNECTOR_STRICT_GUARD_SCRIPT", "ORAS_CONNECTOR_STRICT_GUARD_READY"):
             env.pop(optional, None)
         env.update({
@@ -353,6 +378,28 @@ def main() -> int:
                 "ORAS_CONNECTOR_BOOT": str(PROJECT_ROOT / "tools/bizhawk_ui_probe.lua"),
                 "ORAS_UI_PLAN": str(plan), "ORAS_UI_CAPTURE": str(capture),
                 "ORAS_UI_SPEED": str(args.speed), "ORAS_UI_CONTINUE": "1",
+            })
+        if args.scan_save_objects:
+            from oras_save_objects import build_plan
+            profile = json.loads((PROJECT_ROOT / "tools/oras_memory_candidates.json").read_text())["profiles"][
+                identity["rom_sha256"]]
+            plan_bytes, object_report = build_plan(
+                rom, identity["rom_sha256"],
+                save_destination(runtime, identity["program_id"]).read_bytes(), profile,
+            )
+            objects = session / "objects"
+            objects.mkdir()
+            plan_path = objects / "references.bin"
+            plan_path.write_bytes(plan_bytes)  # Private ROM-derived bytes, never distributed.
+            report["save_objects"] = object_report
+            report["scope"] = "Read-only executable references, save-object heap search and AP reconnect"
+            report["save_objects"]["probe_sha256"] = sha256(PROJECT_ROOT / "tools/bizhawk_save_object_probe.lua")
+            report["save_objects"]["search_sha256"] = sha256(PROJECT_ROOT / "tools/inventory_search.lua")
+            report["save_objects"]["plan_sha256"] = sha256(plan_path)
+            env.update({
+                "ORAS_CONNECTOR_OBJECT_SCRIPT": str(PROJECT_ROOT / "tools/bizhawk_save_object_probe.lua"),
+                "ORAS_OBJECT_CAPTURE": str(objects), "ORAS_OBJECT_PLAN": str(plan_path),
+                "ORAS_OBJECT_SEARCH": str(PROJECT_ROOT / "tools/inventory_search.lua"),
             })
         if args.experimental_potion_1_to_2:
             post = session / "native-save"
@@ -387,6 +434,7 @@ def main() -> int:
                             identity["rom_sha256"] if args.experimental_potion_1_to_2 else None,
                             event_reference,
                             strict_ready,
+                            objects if args.scan_save_objects else None,
                         ),
                         timeout=args.timeout,
                     )

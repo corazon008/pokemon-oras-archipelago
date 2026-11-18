@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-18",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "save_sha256_unchanged": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "executable": {
+    "stored_size": 3039008,
+    "expanded_size": 5439488,
+    "expanded_sha256": "d587c98ac5c4dedacf9be4baf2d6b7d10169e6a63f8bc35b132002cc27bc1a37",
+    "full_executable_written_to_disk": false,
+    "complete_literal_size_table_found": false,
+    "complete_or_one_missing_provider_table_found": false,
+    "distinct_block_lengths": 52,
+    "lengths_with_recognized_constant_provider": 51,
+    "unrecognized_length": 760,
+    "constant_recognizer_proves_function_boundaries": false
+  },
+  "selected_objects": [
+    {
+      "block_id": 1,
+      "payload_length": 2960,
+      "dispatch": "0x005E09C4",
+      "size_provider": "0x00463354",
+      "data_getter": "0x00463888",
+      "observed_object": "0x08C6AC7C",
+      "observed_payload": "0x08C6AC80",
+      "static_type_name": "savedata::MYITEM",
+      "static_type_name_pointer": "0x005D35D3"
+    },
+    {
+      "block_id": 19,
+      "payload_length": 1284,
+      "dispatch": "0x005DF40C",
+      "size_provider": "0x00406B24",
+      "data_getter": "0x00406F30",
+      "observed_object": "0x08C7DAE8",
+      "observed_payload": "0x08C7DAEC",
+      "static_type_name": "field::EventWork",
+      "static_type_name_pointer": "0x005D19FA"
+    },
+    {
+      "block_id": 47,
+      "payload_length": 2000,
+      "dispatch": "0x005E074C",
+      "size_provider": "0x0045E13C",
+      "data_getter": "0x0045E180",
+      "observed_object": "0x08C88034",
+      "observed_payload": "0x08C88038",
+      "static_type_name": "savedata::ReservedSaveData",
+      "static_type_name_pointer": "0x005D33A7"
+    }
+  ],
+  "static_lifecycle_leads": {
+    "analysis": "Selected A32 snippets decoded privately with LLVM; no execution breakpoint or call trace",
+    "block47_callback_slot_0x14": "0x0045E144",
+    "callback_uses_data_and_size_getters": true,
+    "callback_tail_branch": "0x0045E17C",
+    "callback_tail_target": "0x0015EBCC",
+    "tail_target_observation": "Sets r2=0 and contains zero stores; candidate zero-fill path, not a proven lifecycle event",
+    "slot_0x08": "0x0045E188",
+    "slot_0x08_tail_target": "0x00300B28",
+    "slot_0x08_observation": "Sets r2=2000 and r0=this+4; target contains source loads and destination stores",
+    "initialization_timing_proven": false,
+    "serialization_call_path_proven": false,
+    "type_names_checked_in_runtime_ram": false
+  },
+  "runtime": [
+    {
+      "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-6ku_6_7e",
+      "status": "complete",
+      "static_reference_ranges": 13,
+      "lua_read_requests": 142,
+      "unique_object": "0x08C88034",
+      "ap_read_requests_including_skipped": 8,
+      "ap_object_rechecks": 0,
+      "guard_requests": 4,
+      "skipped_reads": 2,
+      "game_memory_writes": 0,
+      "save_unchanged": true,
+      "exit_code": 0,
+      "before_backup": "local/oras/backups/before-connector-3g8pp_42",
+      "after_backup": "local/oras/backups/after-connector-yp9drbvp"
+    },
+    {
+      "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-95bt79jr",
+      "status": "complete",
+      "static_reference_ranges": 13,
+      "lua_read_requests": 142,
+      "unique_object": "0x08C88034",
+      "ap_read_requests_including_skipped": 10,
+      "ap_object_rechecks": 2,
+      "ap_object_length": 2004,
+      "ap_object_sha256": "9d109ba46bdb2827bbd61ac7255a2c25d0c33d68d308666d2ea8bbe0dae1f688",
+      "guard_requests": 4,
+      "skipped_reads": 2,
+      "game_memory_writes": 0,
+      "save_unchanged": true,
+      "exit_code": 0,
+      "before_backup": "local/oras/backups/before-connector-t8wfhxd3",
+      "after_backup": "local/oras/backups/after-connector-n2xhkd14"
+    }
+  ],
+  "private_plan_sha256": "5b9bc7ad0f6e25734c9d79480cd76b59e6951c081d201d3b7f9643eb963ae0f7",
+  "stable_across_two_cold_process_starts": true,
+  "arbitrary_nonzero_payload_persistence_tested": false,
+  "block47_exclusively_owned_by_ap": false,
+  "block47_write_allowed": false,
+  "atomic_item_and_index_proven": false,
+  "alpha_sapphire_objects_verified": false
+}

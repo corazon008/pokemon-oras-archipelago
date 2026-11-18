@@ -52,6 +52,9 @@ Avancées du 18 novembre :
 - Aucun compteur atomique item/index vérifié dans ORAS : livraison live bloquée.
 - Shim GUARD strict : erreurs et domaines invalides refusés ; contrôle réel
   sans écriture après reconnexion. Le bloc 47 « Unused » n'est pas réservé à AP.
+- Objets inventaire/EventWork corroborés par le code ; candidat du bloc 47
+  localisé par en-tête non nul, retrouvé à froid et relu après reconnexion.
+  Aucun stockage AP ni cycle de sérialisation approuvé.
 
 ## Documents
 
@@ -75,6 +78,7 @@ Avancées du 18 novembre :
 - [Nouvelle sauvegarde durable — rapport 015](docs/reports/015-new-durable-save-verification.md).
 - [Fondations du client hors ligne — rapport 016](docs/reports/016-offline-delivery-foundations.md).
 - [Recherche de stockage et gardes strictes — rapport 017](docs/reports/017-ledger-storage-and-strict-guards.md).
+- [Exécutable et objets de sauvegarde — rapport 018](docs/reports/018-executable-and-save-objects.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

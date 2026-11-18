@@ -20,6 +20,8 @@ end, "ORAS connector probe shutdown")
 
 local boot = os.getenv("ORAS_CONNECTOR_BOOT")
 if boot then dofile(boot) end
+local objects = os.getenv("ORAS_CONNECTOR_OBJECT_SCRIPT")
+if objects then dofile(objects) end
 local strict_script = os.getenv("ORAS_CONNECTOR_STRICT_GUARD_SCRIPT")
 if strict_script then
     local installed = false
