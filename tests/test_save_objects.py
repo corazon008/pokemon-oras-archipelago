@@ -101,11 +101,13 @@ class ObjectPlanTests(unittest.TestCase):
 
 
 class ObjectObservationTests(unittest.TestCase):
-    def observation(self, matches="0x08004000\n", modified_plan=False, reads=130):
+    def observation(self, matches="0x08004000\n", modified_plan=False, reads=130, manager=False):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             capture = Path(directory)
             plan = struct.pack("<I", 2004) + struct.pack("<I", 0x500030) + bytes(2000)
             report = {"plan_sha256": hashlib.sha256(plan).hexdigest(), "reference_ranges": [{}, {}]}
+            if manager:
+                report["manager"] = {}
             (capture / "complete").write_text("read-only\n")
             (capture / "matches.txt").write_text(matches)
             (capture / "references.bin").write_bytes(plan + (b"x" if modified_plan else b""))
@@ -130,6 +132,12 @@ class ObjectObservationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "read count"):
             self.observation(reads=130)
 
+    def test_manager_reads_are_separately_accounted(self):
+        _, report = self.observation(reads=192, manager=True)
+        self.assertEqual(report["lua_memory_read_requests"], 192)
+        with self.assertRaisesRegex(ValueError, "read count"):
+            self.observation(reads=131, manager=True)
+
 
 @unittest.skipUnless(shutil.which("lua5.4"), "Lua 5.4 is required")
 class LuaObjectProbeTests(unittest.TestCase):
@@ -144,6 +152,9 @@ class LuaObjectProbeTests(unittest.TestCase):
             env = {**os.environ, "ORAS_OBJECT_CAPTURE": directory,
                    "ORAS_OBJECT_PLAN": str(capture / "plan"),
                    "ORAS_OBJECT_SEARCH": str(ROOT / "tools/inventory_search.lua")}
+            env.pop("ORAS_OBJECT_MANAGER_TABLE", None)
+            if mode == "manager":
+                env["ORAS_OBJECT_MANAGER_TABLE"] = str(0x08CDCC78)
             script = f"""
 local mode = {mode!r}
 local pattern = string.pack("<I4", 0x500030) .. string.rep("\\0", 2000)
@@ -157,6 +168,15 @@ memory = {{
    assert(domain == "System Bus")
    calls = calls + 1
    if address == 0x100000 then return mode == "reference" and "bad!" or "code" end
+   if mode == "manager" then
+     if address == 0x08CDCC78 - 0x722D0 then return string.pack("<I4I4", 0x500000, 0x08300000) end
+     if address == 0x08CDCC78 then
+       local t = {{}} for i=0,57 do t[#t+1] = string.pack("<I4", 0x08200000+i*4) end
+       return table.concat(t)
+     end
+     if length == 4 and address >= 0x08200000 and address < 0x08200000+232 then return string.pack("<I4", 0x500030) end
+     if address == 0x08300000 and length == 504 then return string.rep("\\0", 504) end
+   end
    if mode == "short" then return "" end
    if mode == "changed" and length == #pattern then return string.rep("\\0", length) end
    local bytes = string.rep("\\0", length)
@@ -171,7 +191,7 @@ memory = {{
  write_bytes_as_array=function() error("WRITE forbidden") end,
 }}
 local ok, err = pcall(dofile, {str(ROOT / 'tools/bizhawk_save_object_probe.lua')!r})
-if mode == "match" or mode == "empty" then assert(ok, tostring(err))
+if mode == "match" or mode == "empty" or mode == "manager" then assert(ok, tostring(err))
 else assert(not ok, "Fault did not fail") end
 if mode == "domain" then assert(calls == 0) end
 if mode == "reference" then assert(calls == 1) end
@@ -181,6 +201,10 @@ print("OBJECT_FIXTURE_PASS")
                                     timeout=15, env=env)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             complete = (capture / "complete").exists()
+            if mode == "manager":
+                for name, size in (("manager-root.bin", 8), ("manager-table.bin", 232),
+                                   ("manager-headers.bin", 232), ("manager-metadata.bin", 504)):
+                    self.assertEqual((capture / name).stat().st_size, size)
             matches = (capture / "matches.txt").read_text() if complete else None
             reads = (capture / "read-requests.txt").read_text().splitlines() if (capture / "read-requests.txt").exists() else []
             return complete, matches, reads
@@ -196,6 +220,12 @@ print("OBJECT_FIXTURE_PASS")
         self.assertTrue(complete)
         self.assertEqual(matches, "")
         self.assertEqual(len(reads), 129)
+
+    def test_manager_capture_adds_only_bounded_reads(self):
+        complete, matches, reads = self.run_probe("manager")
+        self.assertTrue(complete)
+        self.assertEqual(matches, "0x080FFFF4\n")
+        self.assertEqual(len(reads), 191)
 
     def test_bad_references_domains_partial_reads_and_changed_object_abort(self):
         for mode in ("reference", "domain", "short", "changed"):

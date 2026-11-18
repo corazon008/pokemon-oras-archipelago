@@ -54,6 +54,20 @@
         "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-95bt79jr",
         "inventory_dispatch": "0x005E09C4",
         "event_work_dispatch": "0x005DF40C",
+        "manager": {
+          "report": "docs/reports/019-native-save-manager.md",
+          "evidence": "local/oras/profiles/oras-save-kkvwuxa5/connector-attempt-hyhq63qw",
+          "base": "0x08C6A9A8",
+          "regular_table": "0x08CDCC78",
+          "regular_slots": 58,
+          "total_slots_including_metadata": 59,
+          "metadata_object": "0x08CDCD90",
+          "constructor_offsets_matched": 54,
+          "metadata_descriptors_and_crcs_matched": 58,
+          "reset_timing_proven": false,
+          "serialization_call_path_proven": false,
+          "write_allowed": false
+        },
         "block47": {
           "dispatch": "0x005E074C",
           "object_address": "0x08C88034",

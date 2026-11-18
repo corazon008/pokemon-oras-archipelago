@@ -30,7 +30,7 @@ def load_object_observation(capture, report: dict) -> CodeReference:
     if len(plan) < 2008 or struct.unpack_from("<I", plan, len(plan) - 2008)[0] != 2004:
         raise ValueError("Invalid object pattern trailer")
     reads = (capture / "read-requests.txt").read_text().splitlines()
-    expected_reads = len(report["reference_ranges"]) + 128 + 1
+    expected_reads = len(report["reference_ranges"]) + 128 + 1 + (61 if "manager" in report else 0)
     if len(reads) != expected_reads:
         raise ValueError("Unexpected object-search read count")
     report.update({
@@ -74,7 +74,7 @@ def object_candidates(info: dict, image: bytes) -> list[dict]:
     return results
 
 
-def build_plan(rom, rom_hash: str, save: bytes, profile: dict) -> tuple[bytes, dict]:
+def build_plan(rom, rom_hash: str, save: bytes, profile: dict, manager=False) -> tuple[bytes, dict]:
     if (rom_hash != OR_HASH or profile["program_id"] != "000400000011C400"
             or profile["domain"] != "System Bus"):
         raise ValueError("Save-object research is restricted to the verified OR build")
@@ -127,6 +127,29 @@ def build_plan(rom, rom_hash: str, save: bytes, profile: dict) -> tuple[bytes, d
         if payload % 4 or not 0x08000004 <= payload <= 0x10000000 - BLOCKS[block_id][1]:
             raise ValueError("Known payload reference lies outside the application heap")
         references[payload - 4] = struct.pack("<I", chosen[block_id]["dispatch_address"])
+    manager_report = None
+    if manager:
+        from oras_save_manager import analyze_manager
+        manager_report = analyze_manager(info, image)
+        slots = manager_report["derived_slots"]
+        base = int(profile["inventory_address"], 16) - 4 - slots[1]["object_offset"]
+        if int(profile["event_work"]["address"], 16) - 4 - slots[19]["object_offset"] != base:
+            raise ValueError("Known object headers disagree about manager base")
+        table = base + manager_report["table_offset"]
+        if base % 4 or not 0x08000000 <= base < table <= 0x10000000 - 232:
+            raise ValueError("Predicted manager lies outside the application heap")
+        manager_report.update({"predicted_base": base, "predicted_table": table})
+        start, end = manager_report["assignment_range"]
+        for address in range(start, end, 256):
+            reference(address, min(256, end - address))
+        for address, length in (
+            (0x00465284, 60), (0x00116EE0, 80), (0x004654F4, 80),
+            (0x004652D4, 152), (0x00116824, 68), (0x0045E144, 60), (0x0015EBCC, 64),
+            (0x005E0B24, 44), (0x004EA998, 8),
+        ):
+            reference(address, length)
+        for block_id in (1, 19, 47):
+            references[table + block_id * 4] = struct.pack("<I", base + slots[block_id]["object_offset"])
     offset, length = BLOCKS[47]
     pattern = struct.pack("<I", chosen[47]["dispatch_address"]) + save[offset:offset + length]
     plan = bytearray(struct.pack("<I", len(references)))
@@ -135,7 +158,7 @@ def build_plan(rom, rom_hash: str, save: bytes, profile: dict) -> tuple[bytes, d
         plan.extend(data)
     plan.extend(struct.pack("<I", len(pattern)))
     plan.extend(pattern)
-    return bytes(plan), {
+    report = {
         "static_candidates": list(chosen.values()),
         "source_save_sha256": hashlib.sha256(save).hexdigest(),
         "expanded_code_sha256": hashlib.sha256(image).hexdigest(),
@@ -144,3 +167,6 @@ def build_plan(rom, rom_hash: str, save: bytes, profile: dict) -> tuple[bytes, d
                              for address, data in sorted(references.items())],
         "ownership_proven": False, "write_allowed": False,
     }
+    if manager_report is not None:
+        report["manager"] = manager_report
+    return bytes(plan), report

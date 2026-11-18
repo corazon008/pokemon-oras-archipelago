@@ -191,6 +191,34 @@ lectures Lua séparément des requêtes AP. Les adresses sont des candidats en
 lecture seule, pas du stockage approuvé pour AP.
 Voir le [rapport 018](../docs/reports/018-executable-and-save-objects.md).
 
+### Manager natif — capture en lecture seule
+
+```sh
+python3 tools/oras_save_manager.py \
+  "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds"
+
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --session local/oras/profiles/oras-save-kkvwuxa5 \
+  --trace-save-manager --speed 400 --timeout 240
+```
+
+Le premier outil suit un fragment A32 droit et borné en mémoire : constantes
+et offsets affines, sans exécution des instructions. Il laisse quatre offsets
+de slots inconnus et refuse les formes non prises en charge.
+
+`--trace-save-manager` implique `--scan-save-objects`, EventWork et gardes
+strictes. Le nom signifie recherche de structures : **pas de trace d'exécution,
+breakpoint, hook ou appel de méthode native**. Les références de code et trois
+slots connus sont comparés avant lecture de la table régulière et de ses
+58 en-têtes. 61 lectures supplémentaires capturent manager et métadonnées.
+
+Le manager rapporte 59 entrées : 58 blocs et un index 58 spécial. Les tailles
+reconnues, les offsets prédits et les descripteurs/footer sont comparés à la
+référence ; une divergence échoue. Un provider contenant des appels reste
+non reconnu plutôt qu'exécuté. Les captures `objects/manager-*.bin` sont privées.
+Voir le [rapport 019](../docs/reports/019-native-save-manager.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

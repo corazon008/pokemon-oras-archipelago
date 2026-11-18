@@ -46,6 +46,32 @@ for _, address in ipairs(matches) do
     assert(address % 4 == 0, "Unaligned object match")
     assert(read(address, length) == pattern, "Object changed after heap search")
 end
+local manager_table = os.getenv("ORAS_OBJECT_MANAGER_TABLE")
+if manager_table then
+    local table_address = assert(tonumber(manager_table))
+    assert(table_address % 4 == 0 and table_address >= 0x080722D0
+           and table_address + 232 <= 0x10000000, "Invalid manager table range")
+    local function capture_bytes(name, bytes)
+        local output = assert(io.open(capture .. "/" .. name, "wb"))
+        output:write(bytes); output:close()
+    end
+    local root = read(table_address - 0x722D0, 8)
+    capture_bytes("manager-root.bin", root)
+    local pointers = read(table_address, 232)
+    capture_bytes("manager-table.bin", pointers)
+    local headers = {}
+    for index = 0, 57 do
+        local address = string.unpack("<I4", pointers, index * 4 + 1)
+        assert(address % 4 == 0 and address >= 0x08000000
+               and address + 4 <= 0x10000000, "Invalid manager object pointer")
+        headers[#headers + 1] = read(address, 4)
+    end
+    capture_bytes("manager-headers.bin", table.concat(headers))
+    local metadata = string.unpack("<I4", root, 5)
+    assert(metadata % 4 == 0 and metadata >= 0x08000000
+           and metadata + 504 <= 0x10000000, "Invalid manager metadata pointer")
+    capture_bytes("manager-metadata.bin", read(metadata, 504))
+end
 journal:close()
 local output = assert(io.open(capture .. "/matches.txt", "w"))
 for _, address in ipairs(matches) do output:write(string.format("0x%08X\n", address)) end
