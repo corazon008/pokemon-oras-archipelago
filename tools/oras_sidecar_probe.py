@@ -1,4 +1,4 @@
-"""Exact-OR native registration/read experiment. No save hook or delivery ledger."""
+"""Exact-OR native sidecar experiments. No delivery ledger."""
 
 import hashlib
 from pathlib import Path
@@ -23,15 +23,22 @@ READ = 0x45DACC
 READ_PUSH = 0xE92D4FF8
 READ_CALLERS = (0x45D3D4, 0x124D7C)  # First, then second, on the verified boot path.
 STATUS_SIZE = 36
+WRITE = 0x45DC38
+WRITE_CALLERS = (0x45D23C, 0x124E50, 0x124F34)
+WRITE_STATUS_SIZE = 16
+SAVE_MARKER = b"ASV1"
+MARKER_OFFSET = FILE_SIZE - len(SAVE_MARKER)
 
 
-def stage_fixture(target: Path):
+def stage_fixture(target: Path, *, save_trial=False):
     """Only a probe-owned copy reaches here. Never native-format any archive."""
     files, metadata, tree = capture_stable_archive(target)
     if set(files) != {"main"} or tree["directories"] or metadata != BASE_METADATA:
         raise ValueError("Sidecar experiment requires the known one-file Encore archive")
     # Random file content cannot be reproduced by the patch or by a zeroed BSS.
     payload = PREFIX + secrets.token_bytes(FILE_SIZE - len(PREFIX))
+    if save_trial:
+        payload = payload[:MARKER_OFFSET] + bytes(len(SAVE_MARKER))
     write_synced(target.parent / NAME, payload)
     temp = target.parent.with_suffix(".probe-metadata")
     write_synced(temp, TEST_METADATA)
@@ -48,6 +55,22 @@ def verify_fixture(target, expected):
     if len(expected) != FILE_SIZE or not expected.startswith(PREFIX) or files[NAME] != expected:
         raise ValueError("Missing or altered sidecar experiment payload")
     return tree_digest(tree)
+
+
+def load_saved_fixture(target):
+    """Read only from an already verified archive copy, never create a file."""
+    files, _, _ = capture_stable_archive(target)
+    payload = files.get(NAME, b"")
+    verify_fixture(target, payload)
+    if payload[MARKER_OFFSET:] != SAVE_MARKER:
+        raise ValueError("Sidecar reload requires the saved test marker")
+    return payload
+
+
+def after_save_payload(payload):
+    if len(payload) != FILE_SIZE or not payload.startswith(PREFIX) or any(payload[MARKER_OFFSET:]):
+        raise ValueError("Sidecar SAVE fixture must start with a clear test marker")
+    return payload[:MARKER_OFFSET] + SAVE_MARKER
 
 
 class Stub:
@@ -90,7 +113,7 @@ class Stub:
         return struct.pack(f"<{len(self.words)}I", *self.words)
 
 
-def build_sidecar(info, image, start, owned_page):
+def build_sidecar(info, image, start, owned_page, *, save_trial=False):
     from oras_bootstrap_patch import arm_branch
 
     analyze_registration(info, image)
@@ -155,8 +178,12 @@ def build_sidecar(info, image, start, owned_page):
     s.emit(READ_PUSH)
     s.branch(READ + 4)
 
+    write_status = owned_page + 0x60
+    if save_trial:
+        emit_save_stub(s)
+
     # Interfaces used by the exact-build align/register/read paths. No native
-    # heap allocation or save callbacks installed for this test object.
+    # manager mutation/validation callbacks installed for this test object.
     for name, instruction in (
         ("noop", 0xE3A00000), ("one", 0xE3A00001), ("size", 0xE3A00C02),
     ):
@@ -175,13 +202,20 @@ def build_sidecar(info, image, start, owned_page):
     filename = (NAME + "\0").encode("utf-16le")
     filename += bytes(-len(filename) % 4)
     s.emit(*struct.unpack(f"<{len(filename)//4}I", filename))
-    for name, address in (
+    literals = [
         ("manager_address", manager), ("block_address", block),
         ("status_address", status), ("buffer_address", buffer),
         ("filename_address", s.labels["filename"]),
         ("manager_table_address", s.labels["manager_table"]),
         ("block_table_address", s.labels["block_table"]),
-    ):
+    ]
+    if save_trial:
+        literals += [
+            ("write_status_address", write_status),
+            ("marker_address", buffer + MARKER_OFFSET),
+            ("marker_word", int.from_bytes(SAVE_MARKER, "little")),
+        ]
+    for name, address in literals:
         s.label(name)
         s.emit(address)
     records = [
@@ -189,12 +223,74 @@ def build_sidecar(info, image, start, owned_page):
         (address_offset(info, REG_SITE, 4), struct.pack("<I", arm_branch(REG_SITE, s.labels["register"], True))),
         (address_offset(info, READ, 4), struct.pack("<I", arm_branch(READ, s.labels["read"]))),
     ]
-    return records, s.finish(), {
+    plan = {
         "manager": manager, "block": block, "status": status, "buffer": buffer,
         "register_hook": s.labels["register"], "read_hook": s.labels["read"],
         "manager_table": s.labels["manager_table"], "block_table": s.labels["block_table"],
         "path": f"data:/{NAME}", "size": FILE_SIZE,
     }
+    if save_trial:
+        require_words(info, image, WRITE, [0xE92D4FF8, 0xE1A04001, 0xE1A05000, 0xE1A07002])
+        for site in WRITE_CALLERS:
+            require_words(info, image, site, [arm_branch(site, WRITE, link=True)])
+            records.append((
+                address_offset(info, site, 4),
+                struct.pack("<I", arm_branch(site, s.labels["write"], link=True)),
+            ))
+        plan.update({"write_hook": s.labels["write"], "write_status": write_status})
+    return records, s.finish(), plan
+
+
+def emit_save_stub(s):
+    """Run once after main's writer returns 0. Preserve main's result."""
+    s.label("write")
+    s.literal(12, "status_address")
+    s.emit(0xE59CC000, 0xE150000C)             # registered controller?
+    s.branch(WRITE, condition=1)
+    s.emit(0xE3500000, 0x13510000)             # controller/backend both nonnull
+    s.branch(WRITE, condition=0)
+    s.literal(12, "status_address")
+    s.emit(0xE59CC004, 0xE152000C)             # native main manager?
+    s.branch(WRITE, condition=1)
+    s.literal(12, "status_address")
+    s.emit(0xE59CC010, 0xE35C0002)             # both boot reads ran
+    s.branch(WRITE, condition=1)
+    s.literal(12, "write_status_address")
+    s.emit(0xE59CC000, 0xE35C0000)             # never retry an attempted write
+    s.branch(WRITE, condition=1)
+    s.literal(12, "marker_address")
+    s.emit(0xE59CC000, 0xE35C0000)             # only replace a clear test marker
+    s.branch(WRITE, condition=1)
+    s.emit(0xE92D40F0, 0xE24DD004, 0xE1A04000, 0xE1A05001, 0xE1A06003)
+    s.branch(WRITE, link=True)
+    s.emit(0xE1A07000, 0xE3500000)
+    s.branch("write_exit", condition=1)
+
+    s.literal(12, "write_status_address")
+    s.emit(0xE3A00001, 0xE58C0000, 0xE59D1014, 0xE58C1004)  # attempt, caller LR
+    s.emit(0xE3E00000, 0xE58C0008)             # sentinel until writer returns
+    s.literal(12, "marker_address")
+    s.literal(0, "marker_word")
+    s.emit(0xE58C0000, 0xE1A00004, 0xE1A01005)
+    s.literal(2, "manager_address")
+    s.emit(0xE1A03006)
+    s.branch(WRITE, link=True)
+    s.literal(12, "write_status_address")
+    s.emit(0xE58C0008, 0xE3A00001, 0xE58C000C)  # actual result, returned flag
+    s.label("write_exit")
+    s.emit(0xE1A00007, 0xE28DD004, 0xE8BD80F0)
+
+
+def parse_write_status(data):
+    if len(data) != WRITE_STATUS_SIZE:
+        raise ValueError("Incomplete native sidecar write status")
+    attempts, caller, result, returned = struct.unpack("<4I", data)
+    if (attempts, result, returned) != (1, 0, 1) or caller - 4 not in WRITE_CALLERS:
+        raise ValueError(
+            f"Native sidecar SAVE not corroborated: attempts={attempts}, LR={caller:#x}, "
+            f"result={result}, returned={returned}"
+        )
+    return caller
 
 
 def parse_status(data):
@@ -245,6 +341,10 @@ async def read_sidecar(api, context, plan, expected, audit):
         raise ValueError("Invalid expanded native sidecar controller")
     rows, = await read((records, 96))
     verify_records(rows, main, plan)
+    if "write_status" in plan:
+        write_status, = await read((plan["write_status"], WRITE_STATUS_SIZE))
+        if any(write_status):
+            raise ValueError("Native sidecar writer ran before preflight completed")
     return {
         "controller": controller, "main_manager": main, "records": records,
         "registered_count": registered, "capacity": capacity, "native_read_result": 0,
@@ -254,3 +354,20 @@ async def read_sidecar(api, context, plan, expected, audit):
         "sidecar_registered_and_loaded": True, "next_delivery_index": None,
         "live_delivery_authorized": False,
     }
+
+
+async def read_saved_sidecar(api, context, plan, expected, audit):
+    audit["memory_read_requests"] += 2
+    values = await api.read(context, [
+        (plan["write_status"], WRITE_STATUS_SIZE, "System Bus"),
+        (plan["buffer"], FILE_SIZE, "System Bus"),
+    ])
+    if len(values) != 2:
+        raise ValueError("Incomplete native sidecar SAVE readback")
+    status, payload = values
+    audit["sidecar_write_status_hex"] = status.hex()
+    caller = parse_write_status(status)
+    if payload != after_save_payload(expected):
+        raise ValueError("Native sidecar RAM doesn't match the changed test marker")
+    return {"return_address": caller, "native_write_result": 0,
+            "payload_sha256": hashlib.sha256(payload).hexdigest()}

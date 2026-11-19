@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-19",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "seed_snapshot": "local/oras/backups/before-connector-8ny3zimx",
+  "seed_main_sha256": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "saved_main_sha256": "0138aa630d41c2a2eaa4eb0e9dcfe6a61255dc35cd9c696d91e78ed7fff7689f",
+  "main_changed_blocks": [3, 4, 6, 10, 11, 17, 44],
+  "emulated_initial_time": "2026-11-18T18:36:36",
+  "sidecar_path": "data:/aptest",
+  "sidecar_bytes": 512,
+  "marker_offset": 508,
+  "marker_before_hex": "00000000",
+  "marker_after_hex": "41535631",
+  "writer": "0x0045DC38",
+  "writer_caller": "0x00124E50",
+  "writer_return_address": "0x00124E54",
+  "save_ips_sha256": "6eaf99a6ddbb097760fe028e3aaf3d8a93e7cd8a04a94fde2c5256da9663c510",
+  "reload_ips_sha256": "46bc2b5a799b3baf415b1e4940c19f40938ea7add33d1d23a2deef85b8d0860a",
+  "attempts": {
+    "ui_failure": {
+      "profile": "local/oras/profiles/oras-connector-ae5ef_vx",
+      "status": "failed",
+      "reason": "Continue screen advanced during SAVE macro; no writer attempt.",
+      "before_backup": "local/oras/backups/before-connector-8mk9jdme",
+      "after_backup": "local/oras/backups/after-connector-9a3_pvrl"
+    },
+    "save": {
+      "profile": "local/oras/profiles/oras-connector-3v319yju",
+      "status": "complete",
+      "before_backup": "local/oras/backups/before-connector-cx97hc_i",
+      "after_backup": "local/oras/backups/after-connector-ru0nhqh3",
+      "before_payload_sha256": "21372c2b5841aa9d7a51a0cb4d0ee811f5dbd9bec962b1e849f8cbbf7b00e097",
+      "after_payload_sha256": "6f2d36be5488e22ee3c7e027109c96144fed6c2a90e5f15493ab53124cd2b341",
+      "archive_tree_after_sha256": "708a3cd466467f653a32c395c3a744e62f9de469bc66dfdec944ad601629e074",
+      "native_writer_calls": 1,
+      "native_writer_result": 0,
+      "returned": true,
+      "submitted_reads": 39,
+      "connector_writes": 0
+    },
+    "reload": {
+      "profile": "local/oras/profiles/oras-connector-lpb0rxzy",
+      "status": "complete",
+      "before_backup": "local/oras/backups/before-connector-91ui_6no",
+      "after_backup": "local/oras/backups/after-connector-04nncu07",
+      "payload_sha256": "6f2d36be5488e22ee3c7e027109c96144fed6c2a90e5f15493ab53124cd2b341",
+      "source_archive_unchanged": true,
+      "target_archive_unchanged": true,
+      "native_save_hook_installed": false,
+      "submitted_reads": 28,
+      "connector_writes": 0
+    },
+    "unsaved_marker": {
+      "profile": "local/oras/profiles/oras-connector-8z78dpft",
+      "status": "failed",
+      "reason": "Sidecar reload requires the saved test marker",
+      "emulator_launched": false
+    }
+  },
+  "native_inventory_or_event_mutation": false,
+  "normal_shutdown_and_cold_reload_verified": true,
+  "crash_durability_tested": false,
+  "cross_file_atomicity_proven": false,
+  "ledger_implemented": false,
+  "ap_index": null,
+  "live_delivery_authorized": false,
+  "unit_tests_passed": 239
+}

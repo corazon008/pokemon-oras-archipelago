@@ -15,7 +15,9 @@ from oras_save import SAVE_SIZE
 from oras_save_serialization import branch_target
 from oras_sidecar_probe import (
     BASE_METADATA, FILE_SIZE, NAME, PREFIX, READ, READ_CALLERS, READ_PUSH, REG_SITE, REGISTER, TEST_METADATA,
-    build_sidecar, parse_status, read_sidecar, stage_fixture, verify_fixture, verify_records,
+    MARKER_OFFSET, SAVE_MARKER, WRITE, WRITE_CALLERS, after_save_payload, build_sidecar, load_saved_fixture,
+    parse_status, parse_write_status, read_saved_sidecar, read_sidecar, stage_fixture, verify_fixture,
+    verify_records,
 )
 
 
@@ -28,10 +30,10 @@ CALLERS = tuple(address + 4 for address in READ_CALLERS)
 STATUS = (CONTROLLER, MAIN, 2, 0, 2, CALLERS[0], 0, CALLERS[1], 0)
 
 
-def artifacts():
+def artifacts(*, save_trial=False):
     info = {"code_segments": [{"address": 0x100000, "image_offset": 0, "size": 0x500000}]}
     with patch("oras_sidecar_probe.analyze_registration"), patch("oras_sidecar_probe.require_words"):
-        return build_sidecar(info, b"", START, PAGE)
+        return build_sidecar(info, b"", START, PAGE, save_trial=save_trial)
 
 
 def records_fixture(plan):
@@ -90,6 +92,72 @@ class SidecarTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "layout"):
                 verify_fixture(main, payload)
 
+    def test_save_variant_redirects_only_known_writer_callers(self):
+        records, code, plan = artifacts(save_trial=True)
+        self.assertEqual(len(records), 6)
+        for (offset, data), site in zip(records[3:], WRITE_CALLERS, strict=True):
+            self.assertEqual(offset + 0x100000, site)
+            word, = struct.unpack("<I", data)
+            self.assertEqual(word >> 24, 0xEB)
+            self.assertEqual(branch_target(word, site), plan["write_hook"])
+        self.assertGreaterEqual(plan["write_status"], plan["status"] + 36)
+        self.assertLessEqual(plan["write_status"] + 16, plan["buffer"])
+        calls = [
+            index for index, (word,) in enumerate(struct.iter_unpack("<I", code[plan["write_hook"] - START:]))
+            if word >> 24 == 0xEB and branch_target(word, plan["write_hook"] + index * 4) == WRITE
+        ]
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn(SAVE_MARKER, artifacts()[1])
+
+    def test_reload_never_manufactures_marker_or_reseeds_fixture(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            archive = Path(directory) / "00000001"
+            archive.mkdir()
+            main = archive / "main"
+            main.write_bytes(b"unchanged test")
+            archive.with_suffix(".metadata").write_bytes(BASE_METADATA)
+            initial = stage_fixture(main, save_trial=True)
+            self.assertEqual(initial[MARKER_OFFSET:], bytes(4))
+            with self.assertRaisesRegex(ValueError, "saved test marker"):
+                load_saved_fixture(main)
+            saved = after_save_payload(initial)
+            self.assertEqual(saved[:MARKER_OFFSET], initial[:MARKER_OFFSET])
+            self.assertEqual(saved[MARKER_OFFSET:], SAVE_MARKER)
+            (archive / NAME).write_bytes(saved)
+            self.assertEqual(load_saved_fixture(main), saved)
+            self.assertEqual((archive / NAME).read_bytes(), saved)
+            with self.assertRaisesRegex(ValueError, "clear test marker"):
+                after_save_payload(saved)
+
+    def test_write_verifier_requires_completed_attempt_and_entire_changed_payload(self):
+        _, _, plan = artifacts(save_trial=True)
+        expected = PREFIX.ljust(FILE_SIZE, b"\0")
+        status = (1, WRITE_CALLERS[0] + 4, 0, 1)
+
+        class API:
+            def __init__(self, words, payload):
+                self.words, self.payload = words, payload
+
+            async def read(self, _context, ranges):
+                self.ranges = ranges
+                return [struct.pack("<4I", *self.words), self.payload]
+
+        changed = after_save_payload(expected)
+        audit = {"memory_read_requests": 0}
+        api = API(status, changed)
+        result = asyncio.run(read_saved_sidecar(api, None, plan, expected, audit))
+        self.assertEqual(result["return_address"], status[1])
+        self.assertEqual(audit["memory_read_requests"], 2)
+        self.assertEqual(api.ranges[1], (plan["buffer"], FILE_SIZE, "System Bus"))
+        for index, bad_value in ((0, 2), (1, 0), (2, 0xFFFFFFFF), (3, 0)):
+            bad = list(status)
+            bad[index] = bad_value
+            with self.subTest(index=index), self.assertRaises(ValueError):
+                parse_write_status(struct.pack("<4I", *bad))
+        for bad in (expected, changed[:-1], changed[:-5] + b"!" + SAVE_MARKER):
+            with self.assertRaisesRegex(ValueError, "changed test marker"):
+                asyncio.run(read_saved_sidecar(API(status, bad), None, plan, expected, audit))
+
     def test_status_and_record_parser_fail_closed(self):
         _, _, plan = artifacts()
         good = struct.pack("<9I", *STATUS)
@@ -136,19 +204,21 @@ class SidecarTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 asyncio.run(read_sidecar(API(challenge), None, plan, expected, audit))
 
-    def test_cli_disallows_save_and_reuse_with_sidecar_mode(self):
-        for options in (
-            [], ["--session", "old"], ["--seed-save", "seed", "--observe-native-save"],
-            ["--seed-save", "seed", "--experimental-potion-1-to-2"],
-            ["--seed-save", "seed", "--steps", "30:A"],
-        ):
-            r = subprocess.run(
-                [sys.executable, str(ROOT / "tools/run_bizhawk_connector_probe.py"), "--rom", "unused",
-                 "--experimental-bootstrap", "sidecar-load", *options],
-                text=True, capture_output=True, timeout=10,
-            )
-            self.assertEqual(r.returncode, 2)
-            self.assertIn("requires a fresh seed", r.stderr)
+    def test_cli_disallows_other_save_modes_and_reuse_with_sidecar_modes(self):
+        for mode in ("sidecar-load", "sidecar-save", "sidecar-reload"):
+            for options in (
+                [], ["--session", "old"], ["--seed-save", "seed", "--observe-native-save"],
+                ["--seed-save", "seed", "--experimental-potion-1-to-2"],
+                ["--seed-save", "seed", "--steps", "30:A"],
+            ):
+                with self.subTest(mode=mode, options=options):
+                    r = subprocess.run(
+                        [sys.executable, str(ROOT / "tools/run_bizhawk_connector_probe.py"), "--rom", "unused",
+                         "--experimental-bootstrap", mode, *options],
+                        text=True, capture_output=True, timeout=10,
+                    )
+                    self.assertEqual(r.returncode, 2)
+                    self.assertIn("requires a fresh seed", r.stderr)
 
 
 if __name__ == "__main__":

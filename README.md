@@ -79,6 +79,9 @@ Avancées du 18 novembre :
 - Sur OR patché, `data:/aptest` est enregistré puis lu nativement dans la RAM
   ajoutée, vérifié sur deux boots avec des contenus distincts. Fichier de test
   préparé côté hôte ; aucun SAVE ni index AP persistant validé.
+- Un SAVE natif écrit un marqueur de test dans `aptest` après `main`. Marqueur
+  relu après arrêt normal et cold boot ; aucune atomicité inter-fichiers ni
+  livraison AP démontrée.
 
 ## Documents
 
@@ -111,6 +114,7 @@ Avancées du 18 novembre :
 - [Trace native de l'enregistrement des fichiers — rapport 024](docs/reports/024-native-save-registration-trace.md).
 - [Snapshots/imports d'archive complète — rapport 025](docs/reports/025-full-archive-snapshots-and-imports.md).
 - [Enregistrement et lecture du sidecar natif — rapport 026](docs/reports/026-native-sidecar-load.md).
+- [SAVE et cold reload du sidecar — rapport 027](docs/reports/027-native-sidecar-save-reload.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

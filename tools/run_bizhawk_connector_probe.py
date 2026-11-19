@@ -253,6 +253,22 @@ async def finish_native_ui(process, signal: Path, marker: Path, timeout: float) 
     raise TimeoutError("Native save macro timed out; do not retry memory write")
 
 
+async def verify_native_sidecar_save(api, process, timeout, code, plan, expected, audit):
+    from oras_sidecar_probe import read_saved_sidecar
+    context = api.BizHawkContext()
+    try:
+        await connect_until_ready(api, context, process, asyncio.get_running_loop().time() + timeout)
+        if await api.get_script_version(context) != 1:
+            raise ValueError("Unexpected connector version after sidecar SAVE")
+        validate_responses(await api.send_requests(context, list(REQUESTS)))
+        audit["memory_read_requests"] += 1
+        if await api.read(context, [(code.address, len(code.expected), "System Bus")]) != [code.expected]:
+            raise ValueError("Runtime code changed after sidecar SAVE")
+        return await read_saved_sidecar(api, context, plan, expected, audit)
+    finally:
+        api.disconnect(context)
+
+
 def reuse_profile(path: Path, rom_hash: str) -> tuple[Path, dict]:
     """Reuse only a matching tool-created profile; never import another save."""
     path = validate_profile_path(path)
@@ -333,8 +349,9 @@ def main() -> int:
                         help="Frame-sample one native SAVE; requires a fresh --seed-save copy, no memory writes")
     parser.add_argument("--initial-time", help="Explicit emulated RTC time (ISO 8601); fresh seeded copies only")
     parser.add_argument("--experimental-bootstrap",
-                        choices=("hook", "allocation-only", "registration-trace", "sidecar-load"),
-                        help="Fresh-copy native probes; sidecar-load only registers/reads a test file, no ledger")
+                        choices=("hook", "allocation-only", "registration-trace",
+                                 "sidecar-load", "sidecar-save", "sidecar-reload"),
+                        help="Fresh-copy native probes; sidecar modes operate only on an experimental test file")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -347,6 +364,9 @@ def main() -> int:
         help="Compare a 64-byte text prefix at the virtual address derived from the ROM ExHeader",
     )
     args = parser.parse_args()
+    sidecar_mode = args.experimental_bootstrap in ("sidecar-load", "sidecar-save", "sidecar-reload")
+    sidecar_save = args.experimental_bootstrap == "sidecar-save"
+    sidecar_reload = args.experimental_bootstrap == "sidecar-reload"
     source, rom = args.bizhawk.resolve(), args.rom.resolve()
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         parser.error("This pinned LuaSocket bundle targets Linux x86_64")
@@ -395,7 +415,11 @@ def main() -> int:
     if strict_guards and not (args.read_code or has_profile):
         parser.error("--strict-guards requires --read-code or a validated profile")
     try:
-        steps = parse_steps(args.steps or (BOOT_GAMEPLAY_STEPS if args.read_event_work else BOOT_MEDICINE_STEPS))
+        default_steps = BOOT_GAMEPLAY_STEPS if args.read_event_work else BOOT_MEDICINE_STEPS
+        if sidecar_save or sidecar_reload:
+            # The sidecar-patched seed is still on Continue after the generic boot plan.
+            default_steps += ",2:A,600:-"
+        steps = parse_steps(args.steps or default_steps)
     except ValueError as error:
         parser.error(str(error))
     if not (source / "EmuHawk.exe").is_file() or not rom.is_file():
@@ -442,12 +466,12 @@ def main() -> int:
             identity["rom_sha256"] = sha256_file(rom)
             report["rom_identity"] = identity
             report["scope"] = "TCP metadata and ROM-derived code-prefix reads only"
-        if args.experimental_bootstrap == "sidecar-load":
+        if sidecar_mode:
             from oras_save_objects import OR_HASH
             if identity["rom_sha256"] != OR_HASH:
-                raise ValueError("Sidecar load requires the exact verified OR build")
+                raise ValueError("Sidecar experiment requires the exact verified OR build")
             if args.seed_save.name != "main" or args.seed_save.parent.name != "00000001":
-                raise ValueError("Sidecar load requires a verified snapshot's 00000001/main")
+                raise ValueError("Sidecar experiment requires a verified snapshot's 00000001/main")
             recovery_snapshot_reference(args.seed_save.parent.parent, identity)
         if args.recover_from_snapshot:
             report["recovery_fork"] = recovery_snapshot_reference(args.recover_from_snapshot, identity)
@@ -476,18 +500,20 @@ def main() -> int:
                     identity["program_id"], identity["rom_sha256"],
                 )
                 report["archive"] = archive
-                if (archive["archive_file_count"] > 1 or archive["archive_directory_count"]) and not args.recover_from_snapshot:
-                    raise ValueError("Multi-file archive boot requires an explicit read-only recovery fork")
-            if args.experimental_bootstrap == "sidecar-load":
-                from oras_sidecar_probe import NAME, stage_fixture, verify_fixture
+                if ((archive["archive_file_count"] > 1 or archive["archive_directory_count"])
+                        and not (args.recover_from_snapshot or sidecar_reload)):
+                    raise ValueError("Multi-file archive boot requires explicit read-only recovery or sidecar reload")
+            if sidecar_mode:
+                from oras_sidecar_probe import NAME, load_saved_fixture, stage_fixture, verify_fixture
                 target = save_destination(runtime, identity["program_id"])
-                sidecar_expected = stage_fixture(target)
+                sidecar_expected = (load_saved_fixture(target) if sidecar_reload
+                                    else stage_fixture(target, save_trial=sidecar_save))
                 report["sidecar_fixture"] = {
                     "name": NAME,
                     "length": len(sidecar_expected),
                     "sha256": hashlib.sha256(sidecar_expected).hexdigest(),
                     "archive_tree_before_boot": verify_fixture(target, sidecar_expected),
-                    "host_seeded": True,
+                    "host_seeded": not sidecar_reload,
                     "native_save_tested": False,
                     "persistent_ap_ledger_implemented": False,
                 }
@@ -519,6 +545,8 @@ def main() -> int:
                 report["scope"] = "Experimental native constructor/registration trace; no SAVE or AP record"
             if sidecar_expected is not None:
                 report["scope"] = "Experimental native sidecar registration and load; no SAVE or delivery"
+            if sidecar_save:
+                report["scope"] = "Experimental native sidecar SAVE after main; no item or AP delivery"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -584,13 +612,13 @@ def main() -> int:
                     report["save_objects"]["manager"]["record_referrers_requested"] = True
                     report["save_objects"]["manager"]["references_analysis_sha256"] = sha256(
                         PROJECT_ROOT / "tools/oras_save_references.py")
-        if args.experimental_potion_1_to_2 or args.observe_native_save:
+        if args.experimental_potion_1_to_2 or args.observe_native_save or sidecar_save:
             post = session / "native-save"
             post.mkdir()
             post_plan = post / "steps.txt"
             # Observation starts in the source-verified overworld, before any bag/menu work changes.
             observation_menu = "2:X,60:-,2:A,120:-,2:Right,60:-,"
-            post_steps = parse_steps((observation_menu if args.observe_native_save else "") + NATIVE_SAVE_STEPS)
+            post_steps = parse_steps((observation_menu if args.observe_native_save or sidecar_save else "") + NATIVE_SAVE_STEPS)
             post_plan.write_text("".join(f"{frames}:{names}\n" for frames, names in post_steps))
             report["native_save_steps"] = post_steps
             env.update({
@@ -647,11 +675,22 @@ def main() -> int:
                         (Path(report["backup_before_launch"]) / "00000001/main").read_bytes(),
                         report["save_objects"],
                     )
-                if args.experimental_potion_1_to_2 or args.observe_native_save:
+                if sidecar_save:
+                    from oras_sidecar_probe import verify_fixture
+                    if verify_fixture(save_destination(runtime, identity["program_id"]), sidecar_expected) != (
+                        report["sidecar_fixture"]["archive_tree_before_boot"]
+                    ):
+                        raise ValueError("Sidecar archive changed before the SAVE signal")
+                if args.experimental_potion_1_to_2 or args.observe_native_save or sidecar_save:
                     asyncio.run(finish_native_ui(
                         process, session / "finish-ui", post / "complete", args.timeout,
                     ))
                     report["native_save_macro_completed"] = True
+                if sidecar_save:
+                    report["sidecar_save"] = asyncio.run(asyncio.wait_for(verify_native_sidecar_save(
+                        api, process, args.timeout, code_reference,
+                        report["bootstrap"]["sidecar_probe"], sidecar_expected, report,
+                    ), timeout=args.timeout))
             finally:
                 stop_file.touch()
                 try:
@@ -680,14 +719,19 @@ def main() -> int:
                 report["saved_events_match_reference"] = events_unchanged
             if not args.experimental_potion_1_to_2 and not args.observe_native_save:
                 report["save_unchanged"] = sha256(target) == report["save_sha256_before_launch"]
-                if not report["save_unchanged"]:
+                if sidecar_save and report["save_unchanged"]:
+                    raise ValueError("Native sidecar SAVE did not update main")
+                if not sidecar_save and not report["save_unchanged"]:
                     raise ValueError("Save file changed during read-only probe")
             if sidecar_expected is not None:
-                from oras_sidecar_probe import verify_fixture
-                tree = verify_fixture(target, sidecar_expected)
-                if tree != report["sidecar_fixture"]["archive_tree_before_boot"]:
+                from oras_sidecar_probe import after_save_payload, verify_fixture
+                tree = verify_fixture(target, after_save_payload(sidecar_expected) if sidecar_save else sidecar_expected)
+                if not sidecar_save and tree != report["sidecar_fixture"]["archive_tree_before_boot"]:
                     raise ValueError("Experimental sidecar archive changed during boot")
-                report["sidecar_fixture"]["archive_unchanged_after_boot"] = True
+                report["sidecar_fixture"]["archive_unchanged_after_boot"] = not sidecar_save
+                report["sidecar_fixture"]["archive_tree_after_exit"] = tree
+                if sidecar_save:
+                    report["sidecar_fixture"]["native_save_tested"] = True
             if args.observe_native_save:
                 from oras_native_save_observation import inspect_observation
                 report["native_observation"].update(inspect_observation(

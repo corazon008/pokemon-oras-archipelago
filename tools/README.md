@@ -353,8 +353,9 @@ second record ni de fichier AP. Voir le
 **Snapshots v2 : archive complète.** Tous les fichiers, dossiers vides et
 métadonnées sont conservés et hashés. Liens/fichiers spéciaux, chemins dangereux,
 limites dépassées ou contenu altéré : refus. Les imports multi-fichiers exigent
-un snapshot v2 vérifié et un nouveau fork `--recover-from-snapshot` en lecture
-seule. Un seed brut/v1 reste mono-fichier ; aucune restauration en place.
+un snapshot v2 vérifié et un nouveau fork en lecture seule
+(`--recover-from-snapshot` ou test `sidecar-reload`). Un seed brut/v1 reste
+mono-fichier ; aucune restauration en place.
 Voir le [rapport 025](../docs/reports/025-full-archive-snapshots-and-imports.md).
 
 Préserver les octets d'un sidecar ne valide ni son index AP ni sa cohérence avec
@@ -377,6 +378,21 @@ nouvelle copie uniquement. Il enregistre le fichier de test et vérifie ses
 retours du lecteur avant/après reconnexion. Le contenu est préparé par l'hôte ;
 aucun SAVE, aucun index ni livraison AP. Ne pas réutiliser le profil patché
 pour jouer. Voir le [rapport 026](../docs/reports/026-native-sidecar-load.md).
+
+Pour tester une écriture native du marqueur, reprendre cette commande avec
+`--experimental-bootstrap sidecar-save`. Le lanceur vérifie la copie et ses
+lectures/reconnexions avant d'envoyer les boutons SAVE. Le code invité écrit
+seulement le marqueur de test dans la RAM ajoutée, puis appelle le writer natif
+du sidecar après celui de `main`. La sonde vérifie les octets après SAVE en RAM
+et sur disque, ainsi que les CRC et l'inventaire/EventWork de `main`.
+
+Pour le cold reload, reprendre la commande avec
+`--seed-save <backup_after_exit>/00000001/main` et
+`--experimental-bootstrap sidecar-reload`. Cette variante n'installe pas le hook
+SAVE et ne recrée pas la fixture. Le marqueur et l'archive complète doivent
+déjà être valides avant boot. Ce test ne prouve ni durabilité après panne ni
+atomicité inter-fichiers, et n'autorise aucun replay AP.
+Voir le [rapport 027](../docs/reports/027-native-sidecar-save-reload.md).
 
 ## Identité ROM et preuve de lecture
 
