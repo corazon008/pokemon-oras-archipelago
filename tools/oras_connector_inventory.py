@@ -71,9 +71,19 @@ def potion_transition(rom_hash: str, code: CodeReference, reference: InventoryRe
 
 
 async def add_experimental_potion(api, context, rom_hash: str, code: CodeReference,
-                                 reference: InventoryReference, audit: dict) -> InventoryReference:
+                                  reference: InventoryReference, audit: dict, *,
+                                  runtime_code: CodeReference | None = None,
+                                  extra_guards=()) -> InventoryReference:
     after = potion_transition(rom_hash, code, reference)
-    audit["memory_guard_requests"] = audit.get("memory_guard_requests", 0) + 2
+    runtime_code = runtime_code or code
+    if runtime_code.address != code.address or len(runtime_code.expected) != len(code.expected):
+        raise ValueError("Potion experiment requires a runtime guard at the verified code prefix")
+    guards = [
+        (runtime_code.address, runtime_code.expected, "System Bus"),
+        (reference.address, reference.expected, reference.domain),
+        *extra_guards,
+    ]
+    audit["memory_guard_requests"] = audit.get("memory_guard_requests", 0) + len(guards)
     audit["memory_write_requests"] += 1  # Count submission even if rejected or response lost.
     audit["potion_experiment"] = {
         "status": "submitted_outcome_unknown", "address": "0x08C6B5F2",
@@ -81,9 +91,7 @@ async def add_experimental_potion(api, context, rom_hash: str, code: CodeReferen
         "automatic_retry": False,
     }
     accepted = await api.guarded_write(
-        context, [(0x08C6B5F2, b"\x02\x00", "System Bus")],
-        [(code.address, code.expected, "System Bus"),
-         (reference.address, reference.expected, reference.domain)],
+        context, [(0x08C6B5F2, b"\x02\x00", "System Bus")], guards,
     )
     audit["potion_experiment"]["status"] = "acknowledged" if accepted else "guard_rejected"
     if not accepted:

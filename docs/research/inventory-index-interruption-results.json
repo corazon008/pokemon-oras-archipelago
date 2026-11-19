@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "trial_binding_hex": "87e8b786554219d4",
+  "pre_save": {
+    "snapshot": "local/oras/backups/before-connector-3naw2p_l",
+    "potion_quantity": 1,
+    "synthetic_index": 0,
+    "tree_sha256": "590a7df4f66d2f67d37a5a226f45b88487931f033067205b2e3d6889454691f2"
+  },
+  "normal_save": {
+    "profile": "local/oras/profiles/oras-connector-dej60787",
+    "after_snapshot": "local/oras/backups/after-connector-743ozg2r",
+    "potion_quantity": 2,
+    "synthetic_index": 1,
+    "main_sha256": "af8ac92875a6a86eba614a94e92120278f9ea4a313a829b17d44bae80cb159b5",
+    "tree_sha256": "e56c90af5395e356e6e91d413b9552f4a435a472997116f7548604afb53dfb0f",
+    "writer_status_hex": "01000000544e12000000000001000000",
+    "submitted_reads": 58,
+    "connector_writes": 1
+  },
+  "interrupted_save": {
+    "profile": "local/oras/profiles/oras-connector-zo5b1q86",
+    "before_snapshot": "local/oras/backups/before-connector-najqub2f",
+    "after_snapshot": null,
+    "classification": "inventory-advanced-index-stale",
+    "potion_quantity": 2,
+    "synthetic_index": 0,
+    "main_sha256": "4e8ce46d637af3b1b8f937526aea16a3a0a3c501c68af89972554319e6cdd6cf",
+    "tree_sha256": "eeb486625c1c3d6bf9cea20e72c9f9cb2a733268ba841abc493e2ba8ba44c6f8",
+    "sidecar_matches_pre_save": true,
+    "footer_matches": false,
+    "valid_main_crcs": 58,
+    "barrier_hex": "01000000544e1200ffffffff02000000",
+    "exit_code": -9,
+    "submitted_reads": 139,
+    "connector_writes": 1
+  },
+  "reload_refusal": {
+    "profile": "local/oras/profiles/oras-connector-p7pr5omp",
+    "forensic_package": "local/oras/profiles/oras-joint-forensic-b1uaj8cs/forensic-not-for-recovery-5fhkajs8",
+    "generic_snapshot_valid": true,
+    "error": "ValueError: Synthetic index sidecar does not match main's footer",
+    "emulator_launched": false,
+    "memory_requests": 0
+  },
+  "cold_reload": {
+    "profile": "local/oras/profiles/oras-connector-xprfgmpo",
+    "before_snapshot": "local/oras/backups/before-connector-obsjamsc",
+    "after_snapshot": "local/oras/backups/after-connector-zrlxuhff",
+    "potion_quantity": 2,
+    "synthetic_index": 1,
+    "matching_connections": 2,
+    "writer_installed": false,
+    "archive_unchanged": true,
+    "submitted_reads": 28,
+    "connector_writes": 0
+  },
+  "offline_journal": {
+    "interrupted_pair_rejected_before_receipt_lookup": true,
+    "resubmitted": false,
+    "head_status": "submitted",
+    "identity_is_synthetic": true
+  },
+  "time_wait_launch_refusal_profile": "local/oras/profiles/oras-connector-vkep60r6",
+  "event_work_changed": false,
+  "next_delivery_index": null,
+  "live_delivery_authorized": false,
+  "unit_tests_passed": 272
+}

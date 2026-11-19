@@ -161,9 +161,11 @@ def build_bootstrap(info, image, exheader, hook=True, registration_trace=False, 
 
 
 def install_bootstrap(rom: Path, runtime: Path, mode: str):
+    joint_modes = ("sidecar-index-potion-save", "sidecar-index-potion-interrupt")
     if (mode not in ("hook", "allocation-only", "registration-trace", "sidecar-load", "sidecar-save",
                      "sidecar-reload", "sidecar-interrupt", "sidecar-rollback",
-                     "sidecar-footer-save", "sidecar-footer-reload", "sidecar-index-save", "sidecar-index-reload")
+                     "sidecar-footer-save", "sidecar-footer-reload", "sidecar-index-save", "sidecar-index-reload",
+                     *joint_modes)
             or sha256_file(rom) != OR_HASH):
         raise ValueError("Bootstrap experiment requires the exact verified OR build and mode")
     # Never allow adjacent, unaccounted-for overlays on the user's ROM.
@@ -179,9 +181,10 @@ def install_bootstrap(rom: Path, runtime: Path, mode: str):
     ips, header, prefix, references, report = build_bootstrap(
         info, image, exheader, mode != "allocation-only", mode == "registration-trace",
         mode in ("sidecar-load", "sidecar-reload", "sidecar-rollback", "sidecar-footer-reload", "sidecar-index-reload"),
-        mode in ("sidecar-save", "sidecar-interrupt", "sidecar-footer-save", "sidecar-index-save"),
-        mode == "sidecar-interrupt", mode in ("sidecar-footer-save", "sidecar-index-save"),
-        mode == "sidecar-index-save",
+        mode in ("sidecar-save", "sidecar-interrupt", "sidecar-footer-save", "sidecar-index-save", *joint_modes),
+        mode in ("sidecar-interrupt", "sidecar-index-potion-interrupt"),
+        mode in ("sidecar-footer-save", "sidecar-index-save", *joint_modes),
+        mode in ("sidecar-index-save", *joint_modes),
     )
     report["mode"] = mode
     mod = runtime / "3DS/User/load/mods" / info["program_id"]

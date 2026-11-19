@@ -7,7 +7,7 @@ import struct
 from oras_archive import capture_stable_archive, tree_digest
 from oras_footer_binding import FOOTER_SIZE
 from oras_profiles import digest, validate_snapshot
-from oras_save import METADATA_OFFSET, validate_save
+from oras_save import METADATA_OFFSET, inventory_bytes, validate_save
 from oras_save_objects import OR_HASH
 from oras_sidecar_probe import FILE_SIZE, MARKER_OFFSET, NAME, TEST_METADATA
 
@@ -40,20 +40,42 @@ def parse_index_payload(payload):
     return binding, index
 
 
-def inspect_index_archive(target: Path):
+def _capture_index_archive(target: Path):
     files, metadata, tree = capture_stable_archive(target)
     if set(files) != {"main", NAME} or tree["directories"] or metadata != TEST_METADATA:
         raise ValueError("Unexpected synthetic index archive layout")
     payload = files[NAME]
     binding, index = parse_index_payload(payload)
-    if payload != index_payload(files["main"], binding, index):
-        raise ValueError("Synthetic index sidecar does not match main's footer")
-    return payload, {
-        "binding": binding.hex(), "synthetic_index": index, "footer_matches": True,
+    matches = payload == index_payload(files["main"], binding, index)
+    return files["main"], payload, {
+        "binding": binding.hex(), "synthetic_index": index, "footer_matches": matches,
         "main_sha256": digest(files["main"]), "payload_sha256": digest(payload),
         "footer_sha256": digest(payload[20:MARKER_OFFSET]), "metadata_sha256": digest(metadata),
         "archive_tree_sha256": tree_digest(tree),
         "next_delivery_index": None, "live_delivery_authorized": False,
+    }
+
+
+def inspect_index_archive(target: Path):
+    _, payload, report = _capture_index_archive(target)
+    if not report["footer_matches"]:
+        raise ValueError("Synthetic index sidecar does not match main's footer")
+    return payload, report
+
+
+def inspect_interrupted_index(target: Path, before, expected_inventory):
+    """Require the observed main-only advance; never treat it as an anchor."""
+    main, _, report = _capture_index_archive(target)
+    inventory = inventory_bytes(main)
+    if (before["synthetic_index"] != 0 or report["synthetic_index"] != 0
+            or report["binding"] != before["binding"] or report["footer_matches"]
+            or report["payload_sha256"] != before["payload_sha256"]
+            or inventory != expected_inventory):
+        raise ValueError("Expected updated main inventory with the exact pre-SAVE index-0 sidecar")
+    return {
+        **report, "inventory_sha256": digest(inventory),
+        "classification": "inventory-advanced-index-stale",
+        "main_crc_valid": True, "reload_authorized": False, "replay_authorized": False,
     }
 
 

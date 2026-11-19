@@ -96,6 +96,9 @@ Avancées du 18 novembre :
 - Le compteur synthétique `0 → 1` persiste sur OR. Avec un checkpoint
   post-SAVE épinglé, une paire plus ancienne est refusée même si ses fichiers
   sont cohérents. Toujours aucun index de livraison AP.
+- Un SAVE normal conserve Potion ×2 et l'index de test 1. Une coupure
+  entre les deux écritures laisse Potion ×2 avec l'ancien index 0 ;
+  cette paire est refusée avant démarrage, sans replay.
 
 ## Documents
 
@@ -134,6 +137,7 @@ Avancées du 18 novembre :
 - [Intentions liées aux checkpoints — rapport 030](docs/reports/030-checkpoint-bound-delivery-intent.md).
 - [Footer natif embarqué dans le sidecar — rapport 031](docs/reports/031-native-footer-sidecar-binding.md).
 - [Compteur synthétique et rollback cohérent — rapport 032](docs/reports/032-synthetic-index-rollback.md).
+- [Inventaire et index après interruption — rapport 033](docs/reports/033-inventory-index-interruption.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

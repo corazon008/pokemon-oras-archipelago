@@ -8,7 +8,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import oras_connector_inventory as inventory
@@ -17,6 +17,7 @@ from run_bizhawk_save_probe import seed_archive
 from rom_identity import CodeReference
 from save_fixtures import synthetic_save
 from test_bizhawk_connector import RESPONSES
+from oras_connector_events import EventReference
 
 
 class Writer:
@@ -196,6 +197,47 @@ class PotionTests(unittest.TestCase):
             self.assertEqual(len(api.submissions), 1)
             self.assertEqual(audit["potion_experiment"]["status"], status)
 
+    def test_joint_potion_write_guards_runtime_patch_event_and_exact_sidecar(self):
+        patched = CodeReference(self.code.address, b"\x00" * 64)
+        stub = CodeReference(0x579640, b"stub")
+        events = EventReference(0x08C7DAEC, b"events", inventory.EXPERIMENT_ROM_SHA256)
+        payload = bytes(512)
+        plan = {"synthetic_index_trial": True, "buffer": 0x6AF200, "write_status": 0x6AF060}
+        api = self.api()
+        inventory_read = api.read
+
+        async def read(context, requests):
+            if requests == [(patched.address, len(patched.expected), "System Bus")]:
+                return [patched.expected]
+            if requests == [(stub.address, len(stub.expected), "System Bus")]:
+                return [stub.expected]
+            return await inventory_read(context, requests)
+
+        api.read = read
+        audit = {"memory_read_requests": 0, "memory_write_requests": 0, "bootstrap": {"sidecar_probe": plan}}
+        sidecar = AsyncMock(return_value={"fixture": True})
+        with patch("oras_sidecar_probe.read_sidecar", sidecar), \
+                patch.object(probe, "read_events", new_callable=AsyncMock), \
+                patch.object(probe, "test_strict_guard", new_callable=AsyncMock), \
+                tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            exchanges = asyncio.run(probe.exercise_connector(
+                api, Process(), 1, patched, audit, self.reference, inventory.EXPERIMENT_ROM_SHA256,
+                event_reference=events, strict_ready=Path(directory), bootstrap_references=[stub],
+                sidecar_expected=payload, potion_original_code=self.code,
+            ))
+        self.assertEqual(sidecar.await_count, 3)
+        self.assertEqual(len(api.submissions), 1)
+        _, guards = api.submissions[0]
+        self.assertEqual(guards, [
+            (patched.address, patched.expected, "System Bus"),
+            (self.reference.address, self.reference.expected, "System Bus"),
+            (stub.address, stub.expected, "System Bus"),
+            (plan["buffer"], payload, "System Bus"),
+            (plan["write_status"], bytes(16), "System Bus"),
+            (events.address, events.expected, "System Bus"),
+        ])
+        self.assertEqual(exchanges[2]["inventory_read"]["entries"][0]["quantity"], 2)
+
     def test_write_readback_failure_aborts(self):
         api = self.api()
         async def stale_read(context, requests):
@@ -236,6 +278,17 @@ class PotionTests(unittest.TestCase):
             asyncio.run(inventory.add_experimental_potion(
                 api, None, inventory.EXPERIMENT_ROM_SHA256,
                 CodeReference(0x100000, bytes(64)), self.reference, audit,
+            ))
+        self.assertEqual(api.submissions, [])
+        self.assertEqual(audit["memory_write_requests"], 0)
+
+    def test_alternate_runtime_guard_must_cover_verified_prefix(self):
+        api = self.api()
+        audit = {"memory_write_requests": 0}
+        with self.assertRaisesRegex(ValueError, "runtime guard"):
+            asyncio.run(inventory.add_experimental_potion(
+                api, None, inventory.EXPERIMENT_ROM_SHA256, self.code, self.reference, audit,
+                runtime_code=CodeReference(self.code.address + 4, self.code.expected),
             ))
         self.assertEqual(api.submissions, [])
         self.assertEqual(audit["memory_write_requests"], 0)

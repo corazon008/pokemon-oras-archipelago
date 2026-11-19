@@ -12,11 +12,11 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from oras_index_probe import (
-    INDEX_OFFSET, INDEX_TAG, index_payload, inspect_index_archive, load_index_anchor,
+    INDEX_OFFSET, INDEX_TAG, index_payload, inspect_index_archive, inspect_interrupted_index, load_index_anchor,
     parse_index_payload, require_index_anchor, verify_index_transition,
 )
 from oras_profiles import snapshot_save
-from oras_save import BLOCKS, validate_save
+from oras_save import BLOCKS, inventory_bytes, validate_save
 from oras_save_objects import OR_HASH
 from oras_sidecar_probe import NAME, TEST_METADATA, build_sidecar
 from save_fixtures import synthetic_save, update_fixture_crcs
@@ -115,6 +115,51 @@ class IndexProbeTests(unittest.TestCase):
         self.assertIn(struct.pack("<2I", plan["buffer"] + INDEX_OFFSET, 1), code)
         self.assertIn(struct.pack("<I", plan["buffer"] + 20), code)
         self.assertNotIn(self.token, code)
+
+    def test_interrupted_index_requires_exact_old_sidecar_and_expected_inventory(self):
+        old = bytearray(self.old)
+        slot = BLOCKS[1][0] + 0x970
+        old[slot:slot + 4] = b"\x11\x00\x01\x00"
+        update_fixture_crcs(old)
+        new = bytearray(old)
+        new[slot + 2] = 2
+        update_fixture_crcs(new)
+        target = self.make_archive("split", bytes(old), 0)
+        _, before = inspect_index_archive(target)
+        sidecar = target.parent / NAME
+        expected = inventory_bytes(new)
+        with self.assertRaises(ValueError):
+            inspect_interrupted_index(target, before, expected)
+        target.write_bytes(new)
+        split = inspect_interrupted_index(target, before, expected)
+        self.assertEqual(split["classification"], "inventory-advanced-index-stale")
+        self.assertTrue(split["main_crc_valid"])
+        self.assertFalse(split["footer_matches"])
+        self.assertFalse(split["reload_authorized"])
+        self.assertFalse(split["replay_authorized"])
+        with self.assertRaisesRegex(ValueError, "footer"):
+            inspect_index_archive(target)
+        with self.assertRaises(ValueError):
+            inspect_interrupted_index(target, before, inventory_bytes(old))
+        for unexpected in (index_payload(bytes(old), b"foreign1", 0),
+                           index_payload(bytes(new), self.token, 1),
+                           index_payload(bytes(new), self.token, 0)):
+            sidecar.write_bytes(unexpected)
+            with self.subTest(unexpected=unexpected[:20]), self.assertRaises(ValueError):
+                inspect_interrupted_index(target, before, expected)
+
+    def test_joint_interruption_parks_before_footer_capture_or_index_store(self):
+        info = {"code_segments": [{"address": 0x100000, "image_offset": 0, "size": 0x500000}]}
+        start = 0x579640
+        with patch("oras_sidecar_probe.analyze_registration"), patch("oras_sidecar_probe.require_words"), \
+                patch("oras_footer_binding.verify_footer_getter"):
+            _, code, plan = build_sidecar(
+                info, b"", start, 0x6AF000, save_trial=True, footer=True, index_trial=True, interrupt=True,
+            )
+        offset = plan["interrupt_barrier"] - start
+        self.assertEqual(struct.unpack_from("<I", code, offset)[0], 0xEAFFFFFE)
+        self.assertGreater(code.index(struct.pack("<I", 0xE3A0207A)), offset)
+        self.assertTrue(plan["synthetic_index_trial"])
 
     def test_reload_cli_requires_explicit_anchor(self):
         run = subprocess.run(

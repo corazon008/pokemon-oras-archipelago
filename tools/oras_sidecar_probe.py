@@ -130,7 +130,7 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt
     if index_trial and not footer:
         raise ValueError("Synthetic index requires native footer capture")
     if footer:
-        if not save_trial or interrupt:
+        if not save_trial or (interrupt and not index_trial):
             raise ValueError("Footer experiment requires its own native SAVE variant")
         from oras_footer_binding import verify_footer_getter
         verify_footer_getter(info, image)

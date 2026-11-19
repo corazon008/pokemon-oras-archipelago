@@ -491,6 +491,23 @@ un index égal ne suffit pas sans concordance des hashes. Ne pas substituer
 une ancre non vérifiée ou considérer le compteur comme un reçu AP.
 Voir le [rapport 032](../docs/reports/032-synthetic-index-rollback.md).
 
+### Potion de test et index : SAVE normal ou interrompu
+
+Reprendre la commande `sidecar-footer-save` avec
+`--experimental-bootstrap sidecar-index-potion-save`. Sur le build OR
+exact et une copie de la sauvegarde Potion ×1, ce mode combine l'écriture
+bornée de Potion ×2 avec le compteur de test. Pour la coupure, repartir
+du **snapshot `backup_before_launch` de ce même essai**, avec
+`--experimental-bootstrap sidecar-index-potion-interrupt`. Ce mode coupe
+uniquement le processus EmuHawk du profil jetable après l'écriture de
+`main`, avant toute modification du sidecar. Le profil coupé est une
+preuve, pas un checkpoint de reprise.
+
+Seule la paire intacte `backup_after_exit` de l'essai normal sert à relancer
+`sidecar-index-reload`, avec ce même snapshot comme `--synthetic-index-anchor`.
+Le contrôle ne répare ni ne rejoue la paire interrompue.
+Voir le [rapport 033](../docs/reports/033-inventory-index-interruption.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

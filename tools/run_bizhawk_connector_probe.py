@@ -92,7 +92,8 @@ async def exercise_connector(api, process, timeout: float,
                               strict_ready: Path | None = None,
                               object_capture: Path | None = None,
                               bootstrap_references: list[CodeReference] | None = None,
-                              sidecar_expected: bytes | None = None) -> list[dict]:
+                              sidecar_expected: bytes | None = None,
+                              potion_original_code: CodeReference | None = None) -> list[dict]:
     if event_reference is not None and (code_reference is None or audit is None):
         raise ValueError("Event reads require a runtime code guard and audit")
     if object_capture is not None and (strict_ready is None or audit is None):
@@ -102,7 +103,11 @@ async def exercise_connector(api, process, timeout: float,
     if potion_rom_hash is not None:
         if code_reference is None or inventory_reference is None or audit is None:
             raise ValueError("Potion experiment requires code, inventory and audit")
-        potion_transition(potion_rom_hash, code_reference, inventory_reference)
+        potion_transition(potion_rom_hash, potion_original_code or code_reference, inventory_reference)
+    if potion_original_code is not None and not (
+        potion_rom_hash and bootstrap_references and sidecar_expected and event_reference and strict_ready
+    ):
+        raise ValueError("Joint Potion trial requires a verified patch, sidecar, EventWork and strict guards")
     exchanges = []
     if audit is not None:
         audit["exchanges"] = exchanges
@@ -206,8 +211,21 @@ async def exercise_connector(api, process, timeout: float,
             if strict_ready is not None:
                 exchange["strict_guard_test"] = await test_strict_guard(api, context, code_reference, audit)
             if potion_rom_hash is not None and attempt == 1:
+                extra_guards = []
+                if potion_original_code is not None:
+                    from oras_sidecar_probe import WRITE_STATUS_SIZE
+                    plan = audit["bootstrap"]["sidecar_probe"]
+                    if plan.get("synthetic_index_trial") is not True:
+                        raise ValueError("Joint Potion trial requires the synthetic index writer")
+                    extra_guards = [
+                        *((ref.address, ref.expected, "System Bus") for ref in bootstrap_references),
+                        (plan["buffer"], sidecar_expected, "System Bus"),
+                        (plan["write_status"], bytes(WRITE_STATUS_SIZE), "System Bus"),
+                        (event_reference.address, event_reference.expected, "System Bus"),
+                    ]
                 inventory_reference = await add_experimental_potion(
-                    api, context, potion_rom_hash, code_reference, inventory_reference, audit,
+                    api, context, potion_rom_hash, potion_original_code or code_reference, inventory_reference, audit,
+                    runtime_code=code_reference, extra_guards=extra_guards,
                 )
             exchanges.append(exchange)
             writer = context.streams[1]
@@ -368,7 +386,8 @@ def main() -> int:
                         choices=("hook", "allocation-only", "registration-trace",
                                  "sidecar-load", "sidecar-save", "sidecar-reload", "sidecar-interrupt",
                                  "sidecar-rollback", "sidecar-footer-save", "sidecar-footer-reload",
-                                 "sidecar-index-save", "sidecar-index-reload"),
+                                 "sidecar-index-save", "sidecar-index-reload",
+                                 "sidecar-index-potion-save", "sidecar-index-potion-interrupt"),
                         help="Fresh-copy native probes; sidecar modes operate only on an experimental test file")
     parser.add_argument("--sidecar-save-result", type=Path,
                         help="Trusted local sidecar-save result.json; required for reload/interruption")
@@ -386,13 +405,16 @@ def main() -> int:
         help="Compare a 64-byte text prefix at the virtual address derived from the ROM ExHeader",
     )
     args = parser.parse_args()
-    interrupt = args.experimental_bootstrap == "sidecar-interrupt"
+    legacy_interrupt = args.experimental_bootstrap == "sidecar-interrupt"
+    joint_interrupt = args.experimental_bootstrap == "sidecar-index-potion-interrupt"
+    joint_potion = args.experimental_bootstrap == "sidecar-index-potion-save" or joint_interrupt
+    interrupt = legacy_interrupt or joint_interrupt
     rollback = args.experimental_bootstrap == "sidecar-rollback"
     footer_save = args.experimental_bootstrap == "sidecar-footer-save"
     footer_reload = args.experimental_bootstrap == "sidecar-footer-reload"
-    index_save = args.experimental_bootstrap == "sidecar-index-save"
+    index_save = args.experimental_bootstrap == "sidecar-index-save" or joint_potion
     index_reload = args.experimental_bootstrap == "sidecar-index-reload"
-    before_pair = interrupt or rollback
+    before_pair = legacy_interrupt or rollback
     sidecar_mode = (args.experimental_bootstrap in ("sidecar-load", "sidecar-save", "sidecar-reload")
                     or before_pair or footer_save or footer_reload or index_save or index_reload)
     sidecar_save = args.experimental_bootstrap == "sidecar-save" or interrupt or footer_save or index_save
@@ -461,7 +483,6 @@ def main() -> int:
     mono = shutil.which("mono")
     if not mono:
         parser.error("Mono is not on PATH")
-    require_free_ports()
     temporary_root = PROFILE_ROOT
     temporary_root.mkdir(parents=True, exist_ok=True)
     if args.session:
@@ -489,6 +510,8 @@ def main() -> int:
     archive = None
     try:
         code_reference = None
+        potion_original_code = None
+        expected_inventory = None
         inventory_reference = None
         event_reference = None
         bootstrap_references = None
@@ -514,6 +537,10 @@ def main() -> int:
             _, report["sidecar_footer_source"] = inspect_footer_archive(args.seed_save)
         if index_save or index_reload:
             from oras_index_probe import inspect_index_archive
+        if joint_interrupt:
+            _, report["sidecar_index_source"] = inspect_index_archive(args.seed_save)
+            if report["sidecar_index_source"]["synthetic_index"] != 0:
+                raise ValueError("Interrupted Potion trial requires an intact index-0 snapshot")
         if index_reload:
             from oras_index_probe import load_index_anchor, require_index_anchor
             index_anchor = load_index_anchor(args.synthetic_index_anchor)
@@ -557,7 +584,8 @@ def main() -> int:
                 )
                 report["archive"] = archive
                 if ((archive["archive_file_count"] > 1 or archive["archive_directory_count"])
-                        and not (args.recover_from_snapshot or sidecar_reload or before_pair or footer_reload or index_reload)):
+                        and not (args.recover_from_snapshot or sidecar_reload or before_pair
+                                 or footer_reload or index_reload or joint_interrupt)):
                     raise ValueError("Multi-file archive boot requires explicit read-only recovery or sidecar reload")
             if sidecar_mode:
                 from oras_sidecar_probe import NAME, load_saved_fixture, stage_fixture, verify_fixture
@@ -565,6 +593,10 @@ def main() -> int:
                 if index_reload:
                     sidecar_expected, bound = inspect_index_archive(target)
                     require_index_anchor(bound, index_anchor)
+                elif joint_interrupt:
+                    sidecar_expected, bound = inspect_index_archive(target)
+                    if bound != report["sidecar_index_source"]:
+                        raise ValueError("Imported index-0 pair differs from source")
                 elif footer_reload:
                     sidecar_expected, bound = inspect_footer_archive(target)
                     if bound != report["sidecar_footer_source"]:
@@ -597,7 +629,8 @@ def main() -> int:
                     "length": len(sidecar_expected),
                     "sha256": hashlib.sha256(sidecar_expected).hexdigest(),
                     "archive_tree_before_boot": tree,
-                    "host_seeded": not (sidecar_reload or before_pair or footer_reload or index_reload),
+                    "host_seeded": not (sidecar_reload or before_pair or footer_reload or index_reload
+                                        or joint_interrupt),
                     "native_save_tested": False,
                     "persistent_ap_ledger_implemented": False,
                 }
@@ -609,9 +642,12 @@ def main() -> int:
             report["scope"] = "TCP metadata, code and validated inventory reads, including reconnection"
             report["native_boot_steps"] = steps
             report["speed_percent"] = args.speed
+            if args.experimental_potion_1_to_2 or joint_potion:
+                expected_inventory = potion_transition(identity["rom_sha256"], code_reference, inventory_reference)
             if args.experimental_potion_1_to_2:
-                potion_transition(identity["rom_sha256"], code_reference, inventory_reference)
                 report["scope"] = "Experimental guarded Potion 1-to-2, readback, reconnect and native save"
+            if joint_potion:
+                potion_original_code = code_reference
             if args.read_event_work:
                 report["event_mismatch_capture"] = str(session / "event-mismatch.bin")
                 event_reference = load_event_reference(
@@ -637,6 +673,10 @@ def main() -> int:
                 report["scope"] += "; synthetic index fixture only"
             if interrupt:
                 report["scope"] = "Inter-file failpoint on fresh copy; SIGKILL only after native main writer returns"
+            if joint_potion:
+                report["scope"] = "Guarded Potion 1-to-2 and synthetic index; no AP receipt or replay"
+                if joint_interrupt:
+                    report["scope"] += "; inter-file SIGKILL"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -739,6 +779,7 @@ def main() -> int:
             "encore_sha256": sha256(runtime / "dll/libencore.so"),
             "bundle_verified": True,
         })
+        require_free_ports()
         with (session / "stdout.txt").open("w") as stdout, (session / "stderr.txt").open("w") as stderr:
             process = subprocess.Popen(command, cwd=bundle, env=env, stdout=stdout, stderr=stderr)
             try:
@@ -746,12 +787,13 @@ def main() -> int:
                     asyncio.wait_for(
                         exercise_connector(
                             api, process, args.timeout, code_reference, report, inventory_reference,
-                            identity["rom_sha256"] if args.experimental_potion_1_to_2 else None,
+                            identity["rom_sha256"] if expected_inventory is not None else None,
                             event_reference,
                             strict_ready,
                             objects if args.scan_save_objects else None,
                             bootstrap_references,
                             sidecar_expected,
+                            potion_original_code,
                         ),
                         timeout=args.timeout,
                     )
@@ -814,16 +856,13 @@ def main() -> int:
             raise RuntimeError("EmuHawk did not shut down cleanly")
         if has_profile:
             target = save_destination(runtime, identity["program_id"])
-            if interrupt:
+            if legacy_interrupt:
                 report["interrupted_pair"] = inspect_pair(target, sidecar_witness)
                 if report["interrupted_pair"]["classification"] in ("observed-before", "observed-after"):
                     raise ValueError("Interrupted trial did not produce an unrecognized or split archive")
             report["resulting_save"] = inspect_save(target.read_bytes())
-            expected_inventory = (
-                potion_transition(identity["rom_sha256"], code_reference, inventory_reference).expected
-                if args.experimental_potion_1_to_2 else inventory_reference.expected
-            )
-            if inventory_bytes(target.read_bytes()) != expected_inventory:
+            required_inventory = (expected_inventory or inventory_reference).expected
+            if inventory_bytes(target.read_bytes()) != required_inventory:
                 raise ValueError("Saved inventory does not match expected experiment result")
             report["saved_inventory_matches_expected"] = True
             if event_reference is not None:
@@ -839,7 +878,12 @@ def main() -> int:
                     raise ValueError("Save file changed during read-only probe")
             if sidecar_expected is not None:
                 from oras_sidecar_probe import after_save_payload, verify_fixture
-                if index_save or index_reload:
+                if joint_interrupt:
+                    from oras_index_probe import inspect_interrupted_index
+                    split = inspect_interrupted_index(target, report["sidecar_index_before"], required_inventory)
+                    report["interrupted_pair"] = split
+                    tree = split["archive_tree_sha256"]
+                elif index_save or index_reload:
                     _, bound = inspect_index_archive(target)
                     if index_save:
                         from oras_index_probe import verify_index_transition
@@ -914,7 +958,7 @@ def main() -> int:
             if interrupt:
                 # No ordinary backup or reusable profile for an interrupted SAVE.
                 report["forensic_archive"] = str(save_destination(runtime, identity["program_id"]).parent)
-            elif has_profile:
+            elif has_profile and (not joint_potion or report["status"] == "complete"):
                 try:
                     report["backup_after_exit"] = backup_existing_save(
                         save_destination(runtime, identity["program_id"]),
