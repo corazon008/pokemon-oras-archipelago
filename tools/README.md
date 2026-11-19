@@ -315,6 +315,33 @@ Il n'invoque pas de méthode native ; l'octet de retour I/O n'est pas promu
 flag d'autorisation d'écriture. Voir le
 [rapport 022](../docs/reports/022-recovery-forks-and-load-reset.md).
 
+### Bootstrap natif expérimental — RAM volatile uniquement
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --seed-save local/oras/backups/before-connector-8ny3zimx/00000001/main \
+  --experimental-bootstrap hook \
+  --initial-time 2026-11-18T18:36:36 --speed 400 --timeout 240
+```
+
+Remplacer `hook` par `allocation-only` pour le témoin sans écriture du marqueur.
+Build OR exact uniquement ; profil neuf obligatoire. Réutilisation, recovery,
+SAVE, Potion, scans et macros personnalisées refusés. L'horloge correspond ici
+au seed historique, pas à une règle générale.
+
+L'expérience crée dans le profil privé un petit `code.ips` et un
+`exheader.bin` dérivé de la ROM personnelle : **ne pas distribuer ce dernier**.
+La taille text est étendue explicitement ; une page BSS supplémentaire est
+allouée après les pages originales. Le hook y écrit un marqueur de huit octets
+puis reprend le démarrage natif. Aucun `code.bin` complet ni ROM modifiée.
+
+Les lectures vérifient code/marqueur, inventaire et EventWork avant/après
+reconnexion. `memory_write_requests = 0` compte les requêtes du connecteur :
+**le hook effectue une écriture native de huit octets**, pas un WRITE Lua/AP.
+Ce n'est ni un ledger persistant ni une autorisation de livraison ; le bloc 47
+reste interdit. Voir le [rapport 023](../docs/reports/023-native-bootstrap-and-owned-ram.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

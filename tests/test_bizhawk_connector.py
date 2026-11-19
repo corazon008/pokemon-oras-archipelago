@@ -223,6 +223,79 @@ class ProtocolTests(unittest.TestCase):
         self.assertTrue(all(exchange["code_read"]["matches_rom_prefix"] for exchange in exchanges))
         self.assertNotIn("expected", json.dumps(exchanges))
 
+    def test_bootstrap_rechecks_marker_after_reconnect_and_rejects_bad_reads(self):
+        expected = bytes(range(64))
+        references = [CodeReference(0x104000, b"APBT\x01\0\0\0")]
+
+        class Writer:
+            async def wait_closed(self):
+                pass
+
+        class Context:
+            streams = None
+            _port = 43055
+
+        class Process:
+            def poll(self):
+                return None
+
+        class API:
+            BizHawkContext = Context
+
+            def __init__(self, bad=None):
+                self.bad = bad
+                self.connections = 0
+
+            async def connect(self, context):
+                context.streams = (None, Writer())
+                self.connections += 1
+                return True
+
+            async def get_script_version(self, context):
+                return 1
+
+            async def send_requests(self, context, requests):
+                return copy.deepcopy(RESPONSES)
+
+            async def read(self, context, requests):
+                if requests[0][0] == 0x100000:
+                    return [expected]
+                if self.connections == 2:
+                    if self.bad == "missing":
+                        return []
+                    if self.bad == "partial":
+                        return [references[0].expected[:4]]
+                    if self.bad == "zero":
+                        return [bytes(8)]
+                return [references[0].expected]
+
+            def disconnect(self, context):
+                context.streams = None
+
+        audit = {"memory_read_requests": 0, "bootstrap": {"mode": "hook"}}
+        exchanges = asyncio.run(probe.exercise_connector(
+            API(), Process(), 1, CodeReference(0x100000, expected), audit,
+            bootstrap_references=references,
+        ))
+        self.assertEqual(audit["memory_read_requests"], 4)
+        self.assertTrue(all(e["bootstrap_reads"][0]["matches_expected"] for e in exchanges))
+        self.assertFalse(exchanges[0]["code_read"]["matches_rom_prefix"])
+        for bad in ("missing", "partial", "zero"):
+            with self.subTest(bad=bad), self.assertRaisesRegex(ValueError, "native marker"):
+                asyncio.run(probe.exercise_connector(
+                    API(bad), Process(), 1, CodeReference(0x100000, expected), {"memory_read_requests": 0},
+                    bootstrap_references=references,
+                ))
+
+    def test_bootstrap_rechecks_require_code_and_audit(self):
+        for code, audit, refs in ((None, {}, [CodeReference(1, b"x")]),
+                                  (CodeReference(1, b"x"), None, [CodeReference(1, b"x")]),
+                                  (CodeReference(1, b"x"), {}, [])):
+            with self.assertRaisesRegex(ValueError, "Bootstrap rechecks"):
+                asyncio.run(probe.exercise_connector(
+                    None, None, 1, code, audit, bootstrap_references=refs,
+                ))
+
 
 if __name__ == "__main__":
     unittest.main()

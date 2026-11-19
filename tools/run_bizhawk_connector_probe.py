@@ -87,11 +87,14 @@ async def exercise_connector(api, process, timeout: float,
                               potion_rom_hash: str | None = None,
                               event_reference: EventReference | None = None,
                               strict_ready: Path | None = None,
-                              object_capture: Path | None = None) -> list[dict]:
+                              object_capture: Path | None = None,
+                              bootstrap_references: list[CodeReference] | None = None) -> list[dict]:
     if event_reference is not None and (code_reference is None or audit is None):
         raise ValueError("Event reads require a runtime code guard and audit")
     if object_capture is not None and (strict_ready is None or audit is None):
         raise ValueError("Object rechecks require strict readiness and audit")
+    if bootstrap_references is not None and (not bootstrap_references or code_reference is None or audit is None):
+        raise ValueError("Bootstrap rechecks require code reference, audit and nonempty references")
     if potion_rom_hash is not None:
         if code_reference is None or inventory_reference is None or audit is None:
             raise ValueError("Potion experiment requires code, inventory and audit")
@@ -137,14 +140,32 @@ async def exercise_connector(api, process, timeout: float,
                     (code_reference.address, len(code_reference.expected), "System Bus"),
                 ])
                 if len(payloads) != 1 or payloads[0] != code_reference.expected:
-                    raise ValueError("Runtime code prefix does not match the selected ROM")
+                    raise ValueError("Runtime code prefix does not match the selected ROM/explicit patch reference")
                 exchange["code_read"] = {
                     "domain": "System Bus",
                     "address": f"0x{code_reference.address:08X}",
                     "length": len(payloads[0]),
                     "sha256": hashlib.sha256(payloads[0]).hexdigest(),
-                    "matches_rom_prefix": True,
+                    "matches_rom_prefix": (
+                        not bootstrap_references or audit.get("bootstrap", {}).get("mode") == "allocation-only"
+                    ),
                 }
+                if bootstrap_references:
+                    exchange["code_read"]["matches_bootstrap_prefix"] = True
+            if bootstrap_references:
+                audit["memory_read_requests"] += len(bootstrap_references)
+                payloads = await api.read(context, [
+                    (ref.address, len(ref.expected), "System Bus") for ref in bootstrap_references
+                ])
+                if len(payloads) != len(bootstrap_references) or any(
+                    actual != ref.expected for actual, ref in zip(payloads, bootstrap_references)
+                ):
+                    raise ValueError("Bootstrap native marker or installed code differs")
+                exchange["bootstrap_reads"] = [
+                    {"address": ref.address, "length": len(actual),
+                     "sha256": hashlib.sha256(actual).hexdigest(), "matches_expected": True}
+                    for ref, actual in zip(bootstrap_references, payloads)
+                ]
             if object_reference is not None:
                 audit["memory_read_requests"] += 1
                 payloads = await api.read(context, [
@@ -219,6 +240,8 @@ def reuse_profile(path: Path, rom_hash: str) -> tuple[Path, dict]:
     manifest = json.loads((path / "profile.json").read_text())
     if manifest.get("kind") != "oras_native_save_probe" or manifest.get("rom_sha256") != rom_hash:
         raise ValueError("Profile/ROM identity mismatch")
+    if manifest.get("experimental_bootstrap"):
+        raise ValueError("Bootstrap profiles require a fresh explicit experiment, not normal profile reuse")
     runtime = path / "runtime"
     if runtime.is_symlink() or not runtime.resolve().is_relative_to(path):
         raise ValueError("Runtime must stay inside the test profile")
@@ -286,6 +309,8 @@ def main() -> int:
     parser.add_argument("--observe-native-save", action="store_true",
                         help="Frame-sample one native SAVE; requires a fresh --seed-save copy, no memory writes")
     parser.add_argument("--initial-time", help="Explicit emulated RTC time (ISO 8601); fresh seeded copies only")
+    parser.add_argument("--experimental-bootstrap", choices=("hook", "allocation-only"),
+                        help="Fresh-copy native startup marker in an explicitly added volatile BSS page; no ledger")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -307,6 +332,13 @@ def main() -> int:
         parser.error("Speed must be between 1 and 1000 percent")
     if args.seed_save and args.session:
         parser.error("--seed-save and --session are mutually exclusive")
+    if args.experimental_bootstrap:
+        if (not args.seed_save or args.session or args.recover_from_snapshot or args.observe_native_save
+                or args.experimental_potion_1_to_2 or args.steps or args.scan_save_objects
+                or args.trace_save_manager or args.scan_save_references):
+            parser.error("--experimental-bootstrap requires a fresh seed; no reuse/recovery/writes/scans/custom steps")
+        args.read_event_work = True
+        args.strict_guards = True
     if args.recover_from_snapshot:
         if args.seed_save or args.session or args.observe_native_save or args.experimental_potion_1_to_2 or args.steps:
             parser.error("--recover-from-snapshot requires a new read-only profile; no seed/session/SAVE/Potion/custom steps")
@@ -377,6 +409,7 @@ def main() -> int:
         code_reference = None
         inventory_reference = None
         event_reference = None
+        bootstrap_references = None
         if args.read_code or has_profile:
             identity, code_reference = inspect_rom(rom)
             if identity["edition_from_program_id"] is None or code_reference is None:
@@ -423,6 +456,12 @@ def main() -> int:
                     identity["rom_sha256"], identity["program_id"], profile_save,
                 )
                 report["scope"] = "Read-only AP transport: code, inventory and EventWork before/after reconnect"
+        if args.experimental_bootstrap:
+            from oras_bootstrap_patch import install_bootstrap
+            code_reference, bootstrap_references, report["bootstrap"] = install_bootstrap(
+                rom, runtime, args.experimental_bootstrap,
+            )
+            report["scope"] = "Experimental native bootstrap on fresh copy; new volatile page, no SAVE or AP ledger"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -532,10 +571,14 @@ def main() -> int:
                             event_reference,
                             strict_ready,
                             objects if args.scan_save_objects else None,
+                            bootstrap_references,
                         ),
                         timeout=args.timeout,
                     )
                 )
+                if args.experimental_bootstrap:
+                    report["bootstrap"]["marker_observed_after_reconnect"] = True
+                    report["bootstrap"]["native_execution_corroborated"] = args.experimental_bootstrap == "hook"
                 if args.observe_native_save:
                     from oras_native_save_observation import prepare_observation
                     if report["memory_write_requests"] != 0:
@@ -592,6 +635,7 @@ def main() -> int:
                 (session / "profile.json").write_text(json.dumps({
                     **archive, "kind": "oras_native_save_probe", "program_id": identity["program_id"],
                     "rom_sha256": identity["rom_sha256"],
+                    **({"experimental_bootstrap": args.experimental_bootstrap} if args.experimental_bootstrap else {}),
                 }, indent=2) + "\n")
         if args.trace_save_manager and not args.observe_native_save:
             inspect_initial_objects(objects, rom, report)

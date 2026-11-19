@@ -67,6 +67,9 @@ Avancées du 18 novembre :
 - Échantillon CRC-invalide refusé avant boot ; fork de récupération depuis snapshot
   vérifié rechargé sans remplacer de profil ni réinitialiser le journal AP.
   Liaison contrôleur/record et chemins reset/load corroborés, sans autorisation d'écriture.
+- Bootstrap natif OR exécuté via IPS : nouvelle page RAM explicitement ajoutée,
+  marqueur relu après reconnexion et témoins sans hook conformes. Sauvegardes
+  inchangées ; ce mécanisme ne fournit pas encore de stockage AP persistant.
 
 ## Documents
 
@@ -95,6 +98,7 @@ Avancées du 18 novembre :
 - [Records de fichier et sérialisation — rapport 020](docs/reports/020-save-records-and-serialization.md).
 - [Sauvegarde native instrumentée — rapport 021](docs/reports/021-native-save-observation.md).
 - [Forks de récupération et reset/load — rapport 022](docs/reports/022-recovery-forks-and-load-reset.md).
+- [Bootstrap natif et RAM ajoutée — rapport 023](docs/reports/023-native-bootstrap-and-owned-ram.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
