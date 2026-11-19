@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "save_profile": "local/oras/profiles/oras-connector-euh_g34k",
+  "trial_binding_hex": "121241f099393bb3",
+  "before": {
+    "snapshot": "local/oras/backups/before-connector-tvms_pl7",
+    "synthetic_index": 0,
+    "tree_sha256": "f36a44a3e4ea575bbde6cb8d0af958e446c9f25088926357e57e80e214088eae",
+    "payload_sha256": "a4b18880bc9e9ee26b6746c6f320d8948c562b83662c2210a53cecdd65e00ac2"
+  },
+  "after": {
+    "snapshot": "local/oras/backups/after-connector-vyoxg3v7",
+    "synthetic_index": 1,
+    "tree_sha256": "d608b8371287ddbce1256d00e3f5f08c33538ac4f1f29945af9b01ea2792b0a3",
+    "payload_sha256": "cac1672cca80766f9d3f06b47cd43486bd7b3ca6d940491bf39c024e96d1632f"
+  },
+  "coherent_rollback": {
+    "profile": "local/oras/profiles/oras-connector-7t3uuszb",
+    "footer_verified": true,
+    "refused_by_index_anchor": true,
+    "emulator_launched": false,
+    "memory_requests": 0
+  },
+  "cold_reload": {
+    "profile": "local/oras/profiles/oras-connector-0gcqfqcw",
+    "before_backup": "local/oras/backups/before-connector-ozfwvrak",
+    "after_backup": "local/oras/backups/after-connector-vww7_gpd",
+    "writer_installed": false,
+    "archive_unchanged": true
+  },
+  "offline_journal_rejects_old_pair_even_with_fabricated_current_index": true,
+  "inventory_changed": false,
+  "next_delivery_index": null,
+  "live_delivery_authorized": false,
+  "unit_tests_passed": 268
+}

@@ -217,7 +217,7 @@ class SidecarTests(unittest.TestCase):
 
     def test_cli_disallows_other_save_modes_and_reuse_with_sidecar_modes(self):
         for mode in ("sidecar-load", "sidecar-save", "sidecar-reload", "sidecar-interrupt", "sidecar-rollback",
-                     "sidecar-footer-save", "sidecar-footer-reload"):
+                      "sidecar-footer-save", "sidecar-footer-reload", "sidecar-index-save", "sidecar-index-reload"):
             for options in (
                 [], ["--session", "old"], ["--seed-save", "seed", "--observe-native-save"],
                 ["--seed-save", "seed", "--experimental-potion-1-to-2"],

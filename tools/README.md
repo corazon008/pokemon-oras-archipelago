@@ -465,6 +465,32 @@ des CRC ou une paire reconstruite côté hôte ne sont pas exclus. Ne pas
 utiliser cette expérience comme reçu AP.
 Voir le [rapport 031](../docs/reports/031-native-footer-sidecar-binding.md).
 
+### Compteur synthétique et rollback cohérent
+
+Reprendre la commande `sidecar-footer-save` avec
+`--experimental-bootstrap sidecar-index-save`. Elle prépare un format de
+test distinct (`ORASIDX1`), avec un identifiant aléatoire de l'essai et un
+index de test à zéro. Le writer expérimental change l'index en 1 avec le
+nouveau footer. Ce format n'est ni un slot AP ni un item.
+
+Pour relire la paire sauvegardée dans une nouvelle copie :
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --seed-save local/oras/backups/after-connector-vyoxg3v7/00000001/main \
+  --experimental-bootstrap sidecar-index-reload \
+  --synthetic-index-anchor local/oras/backups/after-connector-vyoxg3v7 \
+  --initial-time 2026-11-18T18:36:36 --speed 400 --timeout 120
+```
+
+L'ancre est un snapshot local de confiance, épinglé explicitement. Le mode
+reload compare le contenu du seed à cette ancre avant boot et ne charge
+aucun writer. Un index inférieur est refusé même si la paire est cohérente ;
+un index égal ne suffit pas sans concordance des hashes. Ne pas substituer
+une ancre non vérifiée ou considérer le compteur comme un reçu AP.
+Voir le [rapport 032](../docs/reports/032-synthetic-index-rollback.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

@@ -30,12 +30,15 @@ SAVE_MARKER = b"ASV1"
 MARKER_OFFSET = FILE_SIZE - len(SAVE_MARKER)
 
 
-def stage_fixture(target: Path, *, save_trial=False, footer=False):
+def stage_fixture(target: Path, *, save_trial=False, footer=False, index_trial=False):
     """Only a probe-owned copy reaches here. Never native-format any archive."""
     files, metadata, tree = capture_stable_archive(target)
     if set(files) != {"main"} or tree["directories"] or metadata != BASE_METADATA:
         raise ValueError("Sidecar experiment requires the known one-file Encore archive")
-    if footer:
+    if index_trial:
+        from oras_index_probe import new_index_payload
+        payload = new_index_payload(files["main"])
+    elif footer:
         from oras_footer_binding import footer_payload
         payload = footer_payload(files["main"], saved=False)
     else:
@@ -117,12 +120,15 @@ class Stub:
         return struct.pack(f"<{len(self.words)}I", *self.words)
 
 
-def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt=False, footer=False):
+def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt=False, footer=False,
+                  index_trial=False):
     from oras_bootstrap_patch import arm_branch
 
     analyze_registration(info, image)
     if interrupt and not save_trial:
         raise ValueError("Interruption requires the native SAVE variant")
+    if index_trial and not footer:
+        raise ValueError("Synthetic index requires native footer capture")
     if footer:
         if not save_trial or interrupt:
             raise ValueError("Footer experiment requires its own native SAVE variant")
@@ -221,10 +227,12 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt
         ("block_table_address", s.labels["block_table"]),
     ]
     if save_trial:
+        if index_trial:
+            from oras_index_probe import INDEX_OFFSET
         literals += [
             ("write_status_address", write_status),
-            ("marker_address", buffer + MARKER_OFFSET),
-            ("marker_word", int.from_bytes(SAVE_MARKER, "little")),
+            ("marker_address", buffer + (INDEX_OFFSET if index_trial else MARKER_OFFSET)),
+            ("marker_word", 1 if index_trial else int.from_bytes(SAVE_MARKER, "little")),
         ]
     if footer:
         from oras_footer_binding import footer_literals
@@ -256,6 +264,8 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt
             plan["interrupt_barrier"] = s.labels["park"]
         if footer:
             plan["footer_binding"] = True
+        if index_trial:
+            plan["synthetic_index_trial"] = True
     return records, s.finish(), plan
 
 
@@ -394,7 +404,13 @@ async def read_saved_sidecar(api, context, plan, expected, audit):
     status, payload = values
     audit["sidecar_write_status_hex"] = status.hex()
     caller = parse_write_status(status)
-    if plan.get("footer_binding"):
+    if plan.get("synthetic_index_trial"):
+        from oras_index_probe import parse_index_payload
+        before, initial_index = parse_index_payload(expected)
+        after, saved_index = parse_index_payload(payload)
+        if (initial_index, saved_index) != (0, 1) or before != after:
+            raise ValueError("Native synthetic index or binding differs in RAM")
+    elif plan.get("footer_binding"):
         from oras_footer_binding import HEADER
         if (len(payload) != FILE_SIZE or not payload.startswith(HEADER)
                 or payload[MARKER_OFFSET:] != SAVE_MARKER or payload == expected):

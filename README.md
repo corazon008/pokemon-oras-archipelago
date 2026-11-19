@@ -93,6 +93,9 @@ Avancées du 18 novembre :
 - Sur OR patché, le sidecar embarque le footer mis à jour par le SAVE natif.
   Cold reload sans témoin externe vérifié ; un mélange de footers est refusé,
   mais pas un rollback cohérent des deux fichiers.
+- Le compteur synthétique `0 → 1` persiste sur OR. Avec un checkpoint
+  post-SAVE épinglé, une paire plus ancienne est refusée même si ses fichiers
+  sont cohérents. Toujours aucun index de livraison AP.
 
 ## Documents
 
@@ -130,6 +133,7 @@ Avancées du 18 novembre :
 - [Interruption entre les writers — rapport 029](docs/reports/029-interrupted-native-save.md).
 - [Intentions liées aux checkpoints — rapport 030](docs/reports/030-checkpoint-bound-delivery-intent.md).
 - [Footer natif embarqué dans le sidecar — rapport 031](docs/reports/031-native-footer-sidecar-binding.md).
+- [Compteur synthétique et rollback cohérent — rapport 032](docs/reports/032-synthetic-index-rollback.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

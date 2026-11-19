@@ -367,10 +367,13 @@ def main() -> int:
     parser.add_argument("--experimental-bootstrap",
                         choices=("hook", "allocation-only", "registration-trace",
                                  "sidecar-load", "sidecar-save", "sidecar-reload", "sidecar-interrupt",
-                                 "sidecar-rollback", "sidecar-footer-save", "sidecar-footer-reload"),
+                                 "sidecar-rollback", "sidecar-footer-save", "sidecar-footer-reload",
+                                 "sidecar-index-save", "sidecar-index-reload"),
                         help="Fresh-copy native probes; sidecar modes operate only on an experimental test file")
     parser.add_argument("--sidecar-save-result", type=Path,
                         help="Trusted local sidecar-save result.json; required for reload/interruption")
+    parser.add_argument("--synthetic-index-anchor", type=Path,
+                        help="Trusted index-1 snapshot directory; required only for sidecar-index-reload")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -387,10 +390,12 @@ def main() -> int:
     rollback = args.experimental_bootstrap == "sidecar-rollback"
     footer_save = args.experimental_bootstrap == "sidecar-footer-save"
     footer_reload = args.experimental_bootstrap == "sidecar-footer-reload"
+    index_save = args.experimental_bootstrap == "sidecar-index-save"
+    index_reload = args.experimental_bootstrap == "sidecar-index-reload"
     before_pair = interrupt or rollback
     sidecar_mode = (args.experimental_bootstrap in ("sidecar-load", "sidecar-save", "sidecar-reload")
-                    or before_pair or footer_save or footer_reload)
-    sidecar_save = args.experimental_bootstrap == "sidecar-save" or interrupt or footer_save
+                    or before_pair or footer_save or footer_reload or index_save or index_reload)
+    sidecar_save = args.experimental_bootstrap == "sidecar-save" or interrupt or footer_save or index_save
     sidecar_reload = args.experimental_bootstrap == "sidecar-reload"
     source, rom = args.bizhawk.resolve(), args.rom.resolve()
     if platform.system() != "Linux" or platform.machine() != "x86_64":
@@ -410,6 +415,8 @@ def main() -> int:
         args.strict_guards = True
     if (sidecar_reload or before_pair) != (args.sidecar_save_result is not None):
         parser.error("--sidecar-save-result is required with sidecar-reload/sidecar-interrupt/sidecar-rollback only")
+    if index_reload != (args.synthetic_index_anchor is not None):
+        parser.error("--synthetic-index-anchor is required only with sidecar-index-reload")
     if args.recover_from_snapshot:
         if args.seed_save or args.session or args.observe_native_save or args.experimental_potion_1_to_2 or args.steps:
             parser.error("--recover-from-snapshot requires a new read-only profile; no seed/session/SAVE/Potion/custom steps")
@@ -443,7 +450,7 @@ def main() -> int:
         parser.error("--strict-guards requires --read-code or a validated profile")
     try:
         default_steps = BOOT_GAMEPLAY_STEPS if args.read_event_work else BOOT_MEDICINE_STEPS
-        if sidecar_save or sidecar_reload or rollback or footer_reload:
+        if sidecar_save or sidecar_reload or rollback or footer_reload or index_reload:
             # The sidecar-patched seed is still on Continue after the generic boot plan.
             default_steps += ",2:A,600:-"
         steps = parse_steps(args.steps or default_steps)
@@ -505,6 +512,14 @@ def main() -> int:
             from oras_footer_binding import inspect_footer_archive
         if footer_reload:
             _, report["sidecar_footer_source"] = inspect_footer_archive(args.seed_save)
+        if index_save or index_reload:
+            from oras_index_probe import inspect_index_archive
+        if index_reload:
+            from oras_index_probe import load_index_anchor, require_index_anchor
+            index_anchor = load_index_anchor(args.synthetic_index_anchor)
+            report["synthetic_index_anchor"] = index_anchor
+            _, report["sidecar_index_source"] = inspect_index_archive(args.seed_save)
+            require_index_anchor(report["sidecar_index_source"], index_anchor)
         if sidecar_reload or before_pair:
             from oras_sidecar_recovery import inspect_pair, load_witness, require_observed_after
             sidecar_witness = load_witness(args.sidecar_save_result)
@@ -542,12 +557,15 @@ def main() -> int:
                 )
                 report["archive"] = archive
                 if ((archive["archive_file_count"] > 1 or archive["archive_directory_count"])
-                        and not (args.recover_from_snapshot or sidecar_reload or before_pair or footer_reload)):
+                        and not (args.recover_from_snapshot or sidecar_reload or before_pair or footer_reload or index_reload)):
                     raise ValueError("Multi-file archive boot requires explicit read-only recovery or sidecar reload")
             if sidecar_mode:
                 from oras_sidecar_probe import NAME, load_saved_fixture, stage_fixture, verify_fixture
                 target = save_destination(runtime, identity["program_id"])
-                if footer_reload:
+                if index_reload:
+                    sidecar_expected, bound = inspect_index_archive(target)
+                    require_index_anchor(bound, index_anchor)
+                elif footer_reload:
                     sidecar_expected, bound = inspect_footer_archive(target)
                     if bound != report["sidecar_footer_source"]:
                         raise ValueError("Imported native footer pair differs from source")
@@ -562,8 +580,13 @@ def main() -> int:
                     require_observed_after(inspect_pair(target, sidecar_witness))
                     sidecar_expected = load_saved_fixture(target)
                 else:
-                    sidecar_expected = stage_fixture(target, save_trial=sidecar_save, footer=footer_save)
-                if footer_save or footer_reload:
+                    sidecar_expected = stage_fixture(target, save_trial=sidecar_save, footer=footer_save,
+                                                     index_trial=index_save)
+                if index_save or index_reload:
+                    _, bound = inspect_index_archive(target)
+                    tree = bound["archive_tree_sha256"]
+                    report["sidecar_index_before"] = bound
+                elif footer_save or footer_reload:
                     _, bound = inspect_footer_archive(target, saved=footer_reload)
                     tree = bound["archive_tree_sha256"]
                     report["sidecar_footer_before"] = bound
@@ -574,7 +597,7 @@ def main() -> int:
                     "length": len(sidecar_expected),
                     "sha256": hashlib.sha256(sidecar_expected).hexdigest(),
                     "archive_tree_before_boot": tree,
-                    "host_seeded": not (sidecar_reload or before_pair or footer_reload),
+                    "host_seeded": not (sidecar_reload or before_pair or footer_reload or index_reload),
                     "native_save_tested": False,
                     "persistent_ap_ledger_implemented": False,
                 }
@@ -610,6 +633,8 @@ def main() -> int:
                 report["scope"] = "Experimental native sidecar SAVE after main; no item or AP delivery"
             if footer_save or footer_reload:
                 report["scope"] += "; experimental native footer comparison only"
+            if index_save or index_reload:
+                report["scope"] += "; synthetic index fixture only"
             if interrupt:
                 report["scope"] = "Inter-file failpoint on fresh copy; SIGKILL only after native main writer returns"
         wrapper = bundle / "probe.lua"
@@ -684,7 +709,7 @@ def main() -> int:
             # Observation starts in the source-verified overworld, before any bag/menu work changes.
             observation_menu = "2:X,60:-,2:A,120:-,2:Right,60:-,"
             post_steps = parse_steps((observation_menu if args.observe_native_save or sidecar_save else "") + NATIVE_SAVE_STEPS)
-            if interrupt or footer_save:
+            if interrupt or footer_save or index_save:
                 # Wait for the Yes/No prompt to finish rendering; hold confirm
                 # across several native input samples, no second SAVE request.
                 post_steps = parse_steps(observation_menu + "2:B,300:-,2:Down,20:-,6:A,300:-,12:A,900:-")
@@ -747,8 +772,15 @@ def main() -> int:
                 if sidecar_save:
                     from oras_sidecar_probe import verify_fixture
                     target = save_destination(runtime, identity["program_id"])
-                    tree = (inspect_footer_archive(target, saved=False)[1]["archive_tree_sha256"]
-                            if footer_save else verify_fixture(target, sidecar_expected))
+                    if index_save:
+                        _, before = inspect_index_archive(target)
+                        if before["synthetic_index"] != 0:
+                            raise ValueError("Synthetic index SAVE requires index 0")
+                        tree = before["archive_tree_sha256"]
+                    elif footer_save:
+                        tree = inspect_footer_archive(target, saved=False)[1]["archive_tree_sha256"]
+                    else:
+                        tree = verify_fixture(target, sidecar_expected)
                     if tree != report["sidecar_fixture"]["archive_tree_before_boot"]:
                         raise ValueError("Sidecar archive changed before the SAVE signal")
                 if interrupt:
@@ -807,7 +839,17 @@ def main() -> int:
                     raise ValueError("Save file changed during read-only probe")
             if sidecar_expected is not None:
                 from oras_sidecar_probe import after_save_payload, verify_fixture
-                if footer_save or footer_reload:
+                if index_save or index_reload:
+                    _, bound = inspect_index_archive(target)
+                    if index_save:
+                        from oras_index_probe import verify_index_transition
+                        verify_index_transition(report["sidecar_index_before"], bound,
+                                                report["sidecar_save"]["payload_sha256"])
+                    else:
+                        require_index_anchor(bound, index_anchor)
+                    report["sidecar_index_after"] = bound
+                    tree = bound["archive_tree_sha256"]
+                elif footer_save or footer_reload:
                     _, bound = inspect_footer_archive(target)
                     tree = bound["archive_tree_sha256"]
                     if footer_save and (
