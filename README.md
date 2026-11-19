@@ -138,6 +138,7 @@ Avancées du 18 novembre :
 - [Footer natif embarqué dans le sidecar — rapport 031](docs/reports/031-native-footer-sidecar-binding.md).
 - [Compteur synthétique et rollback cohérent — rapport 032](docs/reports/032-synthetic-index-rollback.md).
 - [Inventaire et index après interruption — rapport 033](docs/reports/033-inventory-index-interruption.md).
+- [Reprise du checkpoint pré-SAVE sans replay — rapport 034](docs/reports/034-interrupted-potion-recovery.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

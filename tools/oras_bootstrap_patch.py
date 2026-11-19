@@ -165,7 +165,7 @@ def install_bootstrap(rom: Path, runtime: Path, mode: str):
     if (mode not in ("hook", "allocation-only", "registration-trace", "sidecar-load", "sidecar-save",
                      "sidecar-reload", "sidecar-interrupt", "sidecar-rollback",
                      "sidecar-footer-save", "sidecar-footer-reload", "sidecar-index-save", "sidecar-index-reload",
-                     *joint_modes)
+                      "sidecar-index-potion-rollback", *joint_modes)
             or sha256_file(rom) != OR_HASH):
         raise ValueError("Bootstrap experiment requires the exact verified OR build and mode")
     # Never allow adjacent, unaccounted-for overlays on the user's ROM.
@@ -180,7 +180,8 @@ def install_bootstrap(rom: Path, runtime: Path, mode: str):
         exheader = source.read(0x800)
     ips, header, prefix, references, report = build_bootstrap(
         info, image, exheader, mode != "allocation-only", mode == "registration-trace",
-        mode in ("sidecar-load", "sidecar-reload", "sidecar-rollback", "sidecar-footer-reload", "sidecar-index-reload"),
+        mode in ("sidecar-load", "sidecar-reload", "sidecar-rollback", "sidecar-footer-reload",
+                 "sidecar-index-reload", "sidecar-index-potion-rollback"),
         mode in ("sidecar-save", "sidecar-interrupt", "sidecar-footer-save", "sidecar-index-save", *joint_modes),
         mode in ("sidecar-interrupt", "sidecar-index-potion-interrupt"),
         mode in ("sidecar-footer-save", "sidecar-index-save", *joint_modes),

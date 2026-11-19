@@ -508,6 +508,21 @@ Seule la paire intacte `backup_after_exit` de l'essai normal sert à relancer
 Le contrôle ne répare ni ne rejoue la paire interrompue.
 Voir le [rapport 033](../docs/reports/033-inventory-index-interruption.md).
 
+Pour examiner la perte de progression avant d'ouvrir une copie du
+checkpoint antérieur à la coupure :
+
+```sh
+seed=local/oras/backups/before-connector-najqub2f/00000001/main
+witness=local/oras/profiles/oras-connector-zo5b1q86/result.json
+python3 tools/oras_potion_recovery.py --seed-save "$seed" --interrupted-potion-result "$witness"
+```
+
+Pour lancer cette copie précise, utiliser `--experimental-bootstrap
+sidecar-index-potion-rollback` avec les deux mêmes arguments, la ROM OR
+vérifiée et `--initial-time 2026-11-18T18:36:36 --speed 400 --timeout 120`.
+Le fork reprend à Potion ×1. L'archive interrompue conserve Potion ×2.
+Voir le [rapport 034](../docs/reports/034-interrupted-potion-recovery.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

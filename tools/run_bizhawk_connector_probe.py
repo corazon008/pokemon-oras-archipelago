@@ -387,12 +387,15 @@ def main() -> int:
                                  "sidecar-load", "sidecar-save", "sidecar-reload", "sidecar-interrupt",
                                  "sidecar-rollback", "sidecar-footer-save", "sidecar-footer-reload",
                                  "sidecar-index-save", "sidecar-index-reload",
-                                 "sidecar-index-potion-save", "sidecar-index-potion-interrupt"),
+                                  "sidecar-index-potion-save", "sidecar-index-potion-interrupt",
+                                  "sidecar-index-potion-rollback"),
                         help="Fresh-copy native probes; sidecar modes operate only on an experimental test file")
     parser.add_argument("--sidecar-save-result", type=Path,
                         help="Trusted local sidecar-save result.json; required for reload/interruption")
     parser.add_argument("--synthetic-index-anchor", type=Path,
                         help="Trusted index-1 snapshot directory; required only for sidecar-index-reload")
+    parser.add_argument("--interrupted-potion-result", type=Path,
+                        help="Trusted SIGKILL result for an explicit read-only Potion rollback fork")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -413,7 +416,8 @@ def main() -> int:
     footer_save = args.experimental_bootstrap == "sidecar-footer-save"
     footer_reload = args.experimental_bootstrap == "sidecar-footer-reload"
     index_save = args.experimental_bootstrap == "sidecar-index-save" or joint_potion
-    index_reload = args.experimental_bootstrap == "sidecar-index-reload"
+    index_rollback = args.experimental_bootstrap == "sidecar-index-potion-rollback"
+    index_reload = args.experimental_bootstrap == "sidecar-index-reload" or index_rollback
     before_pair = legacy_interrupt or rollback
     sidecar_mode = (args.experimental_bootstrap in ("sidecar-load", "sidecar-save", "sidecar-reload")
                     or before_pair or footer_save or footer_reload or index_save or index_reload)
@@ -437,8 +441,10 @@ def main() -> int:
         args.strict_guards = True
     if (sidecar_reload or before_pair) != (args.sidecar_save_result is not None):
         parser.error("--sidecar-save-result is required with sidecar-reload/sidecar-interrupt/sidecar-rollback only")
-    if index_reload != (args.synthetic_index_anchor is not None):
+    if (index_reload and not index_rollback) != (args.synthetic_index_anchor is not None):
         parser.error("--synthetic-index-anchor is required only with sidecar-index-reload")
+    if index_rollback != (args.interrupted_potion_result is not None):
+        parser.error("--interrupted-potion-result is required only with sidecar-index-potion-rollback")
     if args.recover_from_snapshot:
         if args.seed_save or args.session or args.observe_native_save or args.experimental_potion_1_to_2 or args.steps:
             parser.error("--recover-from-snapshot requires a new read-only profile; no seed/session/SAVE/Potion/custom steps")
@@ -543,7 +549,15 @@ def main() -> int:
                 raise ValueError("Interrupted Potion trial requires an intact index-0 snapshot")
         if index_reload:
             from oras_index_probe import load_index_anchor, require_index_anchor
-            index_anchor = load_index_anchor(args.synthetic_index_anchor)
+            if index_rollback:
+                from oras_potion_recovery import recovery_plan
+                plan = recovery_plan(args.seed_save, args.interrupted_potion_result)
+                report["potion_recovery"] = plan
+                print("Recovery fork: Potion x2 -> x1, test index 0; changed main blocks left in the "
+                      f"interrupted profile: {plan['changed_main_block_ids_not_carried_into_fork']}", flush=True)
+                index_anchor = plan["anchor"]
+            else:
+                index_anchor = load_index_anchor(args.synthetic_index_anchor)
             report["synthetic_index_anchor"] = index_anchor
             _, report["sidecar_index_source"] = inspect_index_archive(args.seed_save)
             require_index_anchor(report["sidecar_index_source"], index_anchor)
@@ -945,6 +959,13 @@ def main() -> int:
             report["recovery_fork"]["full_archive_matches_snapshot_after_boot"] = unchanged
             if not unchanged:
                 raise ValueError("Recovery fork archive changed during read-only boot")
+        if index_rollback:
+            if (recovery_plan(args.seed_save, args.interrupted_potion_result) != report["potion_recovery"]
+                    or report["memory_write_requests"] != 0 or not report["save_unchanged"]
+                    or "write_hook" in report["bootstrap"]["sidecar_probe"]):
+                raise ValueError("Cannot corroborate isolated read-only Potion rollback")
+            report["scope"] = "Read-only fork of the pre-interruption checkpoint; no replay"
+            report["potion_recovery_sources_reverified"] = True
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"
