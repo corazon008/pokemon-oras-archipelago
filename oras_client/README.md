@@ -73,6 +73,11 @@ been established. The experimental cold reload used an explicit fixed clock
 on an isolated copy; an unknown EventWork tail byte varies with time context
 and is neither masked nor repurposed as AP storage.
 
+The [research recovery fork](../docs/reports/022-recovery-forks-and-load-reset.md)
+boots a verified older snapshot in a new profile only. It does not establish AP
+world binding, infer a delivery index, reset this journal or authorize replay.
+Restoring a CRC-valid file is not reconciliation of delivered items.
+
 Without a verified game-side counter, `next_delivery_index` must be `None`.
 The coordinator then refuses to submit anything. Potion quantity cannot stand
 in for a delivery index: consumption, native gifts and rollback change quantity.

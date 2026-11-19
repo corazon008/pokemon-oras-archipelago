@@ -29,7 +29,7 @@ from oras_connector_inventory import (
 from oras_save import inspect_save, inventory_bytes
 from oras_events import event_bytes
 from oras_connector_events import BOOT_GAMEPLAY_STEPS, EventReference, load_event_reference, read_events
-from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path
+from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path, validate_snapshot
 
 
 REQUESTS = (
@@ -242,6 +242,20 @@ def apply_initial_time(config_path: Path, value: str) -> str:
     return canonical
 
 
+def recovery_snapshot_reference(snapshot: Path, identity: dict) -> dict:
+    manifest = validate_snapshot(snapshot, identity["rom_sha256"])
+    if manifest["program_id"] != identity["program_id"]:
+        raise ValueError("Recovery snapshot/ROM program ID mismatch")
+    return {
+        "source_snapshot": str(snapshot.resolve()),
+        "source_save_sha256": manifest["save_sha256"],
+        "source_metadata_sha256": manifest["metadata_sha256"],
+        "restore_in_place": False, "ap_binding_proven": False,
+        "next_delivery_index": None, "live_delivery_authorized": False,
+        "journal_reset_or_replay_authorized": False,
+    }
+
+
 def inspect_initial_objects(objects, rom, report):
     from oras_save_manager import inspect_manager_capture
     manager = report["save_objects"]["manager"]
@@ -262,6 +276,8 @@ def main() -> int:
     parser.add_argument("--rom", type=Path, required=True)
     parser.add_argument("--timeout", type=float, default=60)
     parser.add_argument("--seed-save", type=Path, help="Copy a validated save/archive; read inventory after native boot")
+    parser.add_argument("--recover-from-snapshot", type=Path,
+                        help="Read-only recovery fork from verified snapshot; never restore in place or replay items")
     parser.add_argument("--session", type=Path, help="Reuse an identified tool-created profile for read-only probes")
     parser.add_argument("--read-event-work", action="store_true", help="Read full EventWork plus bounded clock-scene candidate")
     parser.add_argument("--scan-save-objects", action="store_true", help="Read-only executable-derived block47 object search")
@@ -291,6 +307,12 @@ def main() -> int:
         parser.error("Speed must be between 1 and 1000 percent")
     if args.seed_save and args.session:
         parser.error("--seed-save and --session are mutually exclusive")
+    if args.recover_from_snapshot:
+        if args.seed_save or args.session or args.observe_native_save or args.experimental_potion_1_to_2 or args.steps:
+            parser.error("--recover-from-snapshot requires a new read-only profile; no seed/session/SAVE/Potion/custom steps")
+        args.recover_from_snapshot = args.recover_from_snapshot.resolve()
+        args.seed_save = args.recover_from_snapshot / "00000001/main"
+        args.scan_save_references = True
     has_profile = bool(args.seed_save or args.session)
     if args.initial_time and not args.seed_save:
         parser.error("--initial-time requires a fresh --seed-save copy; existing profiles are not changed")
@@ -335,7 +357,9 @@ def main() -> int:
             parser.error(str(error))
         session = Path(tempfile.mkdtemp(prefix="connector-attempt-", dir=profile_path))
     else:
-        session = Path(tempfile.mkdtemp(prefix="oras-connector-", dir=temporary_root))
+        session = Path(tempfile.mkdtemp(
+            prefix="oras-recovery-" if args.recover_from_snapshot else "oras-connector-", dir=temporary_root,
+        ))
     print(f"Isolated connector session: {session}", flush=True)
     report = {
         "schema_version": 1,
@@ -360,6 +384,8 @@ def main() -> int:
             identity["rom_sha256"] = sha256_file(rom)
             report["rom_identity"] = identity
             report["scope"] = "TCP metadata and ROM-derived code-prefix reads only"
+        if args.recover_from_snapshot:
+            report["recovery_fork"] = recovery_snapshot_reference(args.recover_from_snapshot, identity)
         bundle = session / "connector"
         lock = fetch_bundle(bundle)
         api = load_upstream_api(bundle, lock)
@@ -569,6 +595,10 @@ def main() -> int:
                 }, indent=2) + "\n")
         if args.trace_save_manager and not args.observe_native_save:
             inspect_initial_objects(objects, rom, report)
+        if args.recover_from_snapshot:
+            report["scope"] = "Read-only recovery fork; verified snapshot, cold boot and AP reconnect; no delivery replay"
+            report["recovery_fork"]["target_profile"] = str(session)
+            report["recovery_fork"]["copy_matches_snapshot_after_boot"] = report["save_unchanged"]
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"

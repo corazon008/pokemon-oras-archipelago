@@ -283,6 +283,38 @@ RAM échantillonnées/footer et contrôles de progression inchangés. Cela ne pr
 pas une transaction item/index ni une sauvegarde résistante aux crashs.
 Voir le [rapport 021](../docs/reports/021-native-save-observation.md).
 
+### Fork de récupération — jamais en place
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --recover-from-snapshot local/oras/backups/before-connector-8ny3zimx \
+  --initial-time 2026-11-18T18:36:36 --speed 400 --timeout 240
+```
+
+Ce checkpoint historique est vérifié par manifeste, ROM/Program ID, hashes et
+58 CRC, puis importé dans **nouveau** `oras-recovery-*`. La commande ne remplace
+aucun fichier de profil existant et interdit `--session`, un autre `--seed-save`,
+SAVE, Potion et les macros `--steps` personnalisées. Elle vérifie cold boot/reconnexion sans écriture mémoire.
+L'horloge de cet exemple est celle du checkpoint ; ne pas la généraliser.
+
+Le fork peut revenir à une progression plus ancienne. Il ne déduit aucun index
+de livraison, ne réinitialise pas le journal et n'autorise aucun replay AP.
+Un fichier observé CRC-invalide n'est pas un snapshot récupérable.
+
+Pour inspecter statiquement la liaison contrôleur/record et le chemin reset/load :
+
+```sh
+python3 tools/oras_save_lifecycle.py \
+  "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --probe-result local/oras/profiles/oras-recovery-s39bw9g9/result.json
+```
+
+L'outil vérifie des signatures du build exact et des pointeurs capturés.
+Il n'invoque pas de méthode native ; l'octet de retour I/O n'est pas promu
+flag d'autorisation d'écriture. Voir le
+[rapport 022](../docs/reports/022-recovery-forks-and-load-reset.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

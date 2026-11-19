@@ -64,6 +64,9 @@ Avancées du 18 novembre :
 - 19 novembre : SAVE natif instrumenté sur copie, 1 357 frames, rechargement
   à froid réussi. Un état backing CRC-invalide est observé avant le fichier final.
   Source préservée ; horloge contrôlée explicitement sur copie, pas de byte masqué.
+- Échantillon CRC-invalide refusé avant boot ; fork de récupération depuis snapshot
+  vérifié rechargé sans remplacer de profil ni réinitialiser le journal AP.
+  Liaison contrôleur/record et chemins reset/load corroborés, sans autorisation d'écriture.
 
 ## Documents
 
@@ -91,6 +94,7 @@ Avancées du 18 novembre :
 - [Manager natif de sauvegarde — rapport 019](docs/reports/019-native-save-manager.md).
 - [Records de fichier et sérialisation — rapport 020](docs/reports/020-save-records-and-serialization.md).
 - [Sauvegarde native instrumentée — rapport 021](docs/reports/021-native-save-observation.md).
+- [Forks de récupération et reset/load — rapport 022](docs/reports/022-recovery-forks-and-load-reset.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon
