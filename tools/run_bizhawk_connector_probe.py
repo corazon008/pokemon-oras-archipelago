@@ -166,6 +166,13 @@ async def exercise_connector(api, process, timeout: float,
                      "sha256": hashlib.sha256(actual).hexdigest(), "matches_expected": True}
                     for ref, actual in zip(bootstrap_references, payloads)
                 ]
+                trace_plan = audit.get("bootstrap", {}).get("registration_trace")
+                if trace_plan:
+                    from oras_save_registration import read_registration_trace
+                    trace = await read_registration_trace(api, context, trace_plan, audit)
+                    if exchanges and trace != exchanges[0]["registration_trace"]:
+                        raise ValueError("Native registration trace changed after reconnect")
+                    exchange["registration_trace"] = trace
             if object_reference is not None:
                 audit["memory_read_requests"] += 1
                 payloads = await api.read(context, [
@@ -309,7 +316,7 @@ def main() -> int:
     parser.add_argument("--observe-native-save", action="store_true",
                         help="Frame-sample one native SAVE; requires a fresh --seed-save copy, no memory writes")
     parser.add_argument("--initial-time", help="Explicit emulated RTC time (ISO 8601); fresh seeded copies only")
-    parser.add_argument("--experimental-bootstrap", choices=("hook", "allocation-only"),
+    parser.add_argument("--experimental-bootstrap", choices=("hook", "allocation-only", "registration-trace"),
                         help="Fresh-copy native startup marker in an explicitly added volatile BSS page; no ledger")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
@@ -462,6 +469,9 @@ def main() -> int:
                 rom, runtime, args.experimental_bootstrap,
             )
             report["scope"] = "Experimental native bootstrap on fresh copy; new volatile page, no SAVE or AP ledger"
+            if args.experimental_bootstrap == "registration-trace":
+                report["registration_trace_capture"] = str(session / "registration-trace")
+                report["scope"] = "Experimental native constructor/registration trace; no SAVE or AP record"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -578,7 +588,7 @@ def main() -> int:
                 )
                 if args.experimental_bootstrap:
                     report["bootstrap"]["marker_observed_after_reconnect"] = True
-                    report["bootstrap"]["native_execution_corroborated"] = args.experimental_bootstrap == "hook"
+                    report["bootstrap"]["native_execution_corroborated"] = args.experimental_bootstrap != "allocation-only"
                 if args.observe_native_save:
                     from oras_native_save_observation import prepare_observation
                     if report["memory_write_requests"] != 0:

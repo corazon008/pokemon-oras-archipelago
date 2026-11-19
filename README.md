@@ -70,6 +70,9 @@ Avancées du 18 novembre :
 - Bootstrap natif OR exécuté via IPS : nouvelle page RAM explicitement ajoutée,
   marqueur relu après reconnexion et témoins sans hook conformes. Sauvegardes
   inchangées ; ce mécanisme ne fournit pas encore de stockage AP persistant.
+- Appels natifs constructeur/register observés : capacité un, compteur `0 → 1`,
+  record `main` conforme. Snapshots/imports refusent désormais d'omettre un sidecar
+  supplémentaire ; aucune allocation persistante AP ni migration d'archive réalisée.
 
 ## Documents
 
@@ -99,6 +102,7 @@ Avancées du 18 novembre :
 - [Sauvegarde native instrumentée — rapport 021](docs/reports/021-native-save-observation.md).
 - [Forks de récupération et reset/load — rapport 022](docs/reports/022-recovery-forks-and-load-reset.md).
 - [Bootstrap natif et RAM ajoutée — rapport 023](docs/reports/023-native-bootstrap-and-owned-ram.md).
+- [Trace native de l'enregistrement des fichiers — rapport 024](docs/reports/024-native-save-registration-trace.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

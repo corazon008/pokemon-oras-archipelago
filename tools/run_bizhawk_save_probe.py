@@ -13,7 +13,7 @@ import tempfile
 from rom_identity import inspect_rom, sha256_file
 from oras_save import validate_save, inventory_bytes, inventory_entries, compare_medicine_change
 from oras_events import event_bytes, compare_events, EVENT_LENGTH
-from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path
+from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path, require_single_file_archive
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
@@ -67,6 +67,7 @@ def validate_save_container(source: Path) -> None:
 
 def seed_archive(source: Path, destination: Path) -> dict:
     """Copy only a validated main and its required Encore archive metadata."""
+    require_single_file_archive(source)
     source = source.resolve()
     metadata_source = source.parent.with_suffix(".metadata")
     if not metadata_source.is_file() or metadata_source.stat().st_size != 16:

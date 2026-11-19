@@ -49,6 +49,14 @@ def sync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def require_single_file_archive(source: Path) -> None:
+    """Current snapshot/import schema cannot preserve additional native/AP files."""
+    if source.is_symlink() or source.parent.is_symlink():
+        raise ValueError("Single-file archive cannot contain symlinked save data")
+    if {entry.name for entry in source.parent.iterdir()} != {source.name}:
+        raise ValueError("Unsupported multi-file archive; refusing to omit additional save/AP data")
+
+
 def validate_snapshot(path: Path, rom_hash: str | None = None) -> dict:
     manifest = json.loads((path / "snapshot.json").read_text())
     if manifest.get("kind") != "oras_save_snapshot":
@@ -58,7 +66,9 @@ def validate_snapshot(path: Path, rom_hash: str | None = None) -> dict:
         raise ValueError("Invalid snapshot identity")
     if rom_hash is not None and manifest["rom_sha256"] != rom_hash:
         raise ValueError("Snapshot/ROM identity mismatch")
-    data = (path / "00000001/main").read_bytes()
+    source = path / "00000001/main"
+    require_single_file_archive(source)
+    data = source.read_bytes()
     metadata = (path / "00000001.metadata").read_bytes()
     validate_save(data)
     if (len(metadata) != 16 or digest(data) != manifest["save_sha256"]
@@ -74,6 +84,7 @@ def snapshot_save(source: Path, program_id: str, rom_hash: str, label: str,
         raise ValueError("Unsupported snapshot Program ID")
     if not re.fullmatch(r"[0-9a-f]{64}", rom_hash) or not re.fullmatch(r"[a-z0-9-]+", label):
         raise ValueError("Invalid snapshot identity or label")
+    require_single_file_archive(source)
     source = source.resolve()
     metadata_source = source.parent.with_suffix(".metadata")
     data, metadata = source.read_bytes(), metadata_source.read_bytes()
@@ -82,6 +93,7 @@ def snapshot_save(source: Path, program_id: str, rom_hash: str, label: str,
         raise ValueError("Snapshot requires 16-byte Encore archive metadata")
     if source.read_bytes() != data or metadata_source.read_bytes() != metadata:
         raise ValueError("Source changed while reading snapshot")
+    require_single_file_archive(source)
     backup_root.mkdir(parents=True, exist_ok=True, mode=0o700)
     staging = Path(tempfile.mkdtemp(prefix=f".partial-{label}-", dir=backup_root))
     archive = staging / "00000001"

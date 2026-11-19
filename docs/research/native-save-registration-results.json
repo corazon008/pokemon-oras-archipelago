@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-19",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "seed_save_sha256": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "seed_metadata_sha256": "24bb7e7f2835b4a0306d8ef31cb0ff1a37776ee7e8a591efe71e1046c78c4499",
+  "emulated_initial_time": "2026-11-18T18:36:36",
+  "native_sites": {
+    "constructor": "0x00115BF4",
+    "register_entry": "0x00115A84",
+    "register_return": "0x00115BAC",
+    "constructor_caller_return": "0x00108E48",
+    "register_caller_return": "0x00108E58",
+    "registered_count_offset": 4,
+    "capacity_offset": 8,
+    "records_pointer_offset": 12,
+    "record_stride": 48
+  },
+  "observed": {
+    "constructor_calls": 1,
+    "register_entry_calls": 1,
+    "register_return_calls": 1,
+    "controller": "0x08CDCFB8",
+    "constructor_heap": "0x08803000",
+    "manager": "0x08C6A9A8",
+    "backend": "0x08CDD008",
+    "record": "0x08CEDA80",
+    "name_pointer": "0x001091F4",
+    "registered_before": 0,
+    "registered_after": 1,
+    "capacity_before_and_after": 1,
+    "declared_file_size": "0x76000",
+    "path": "data:/main",
+    "slot_sha256": [
+      "b0f3520a8d922fb8caf95fe6e4bd9e7c0d8eeb9619d8b7c8d48561ba602bbd14",
+      "4996de39f8fb1c71c0ab43d0af491437baaed53912a62110dcaeec50b4a18fbe",
+      "c66fe9ee0167f2b86ef28fa878bbd7303ae2b5ab99239299272ec56646604dad"
+    ],
+    "record_sha256": "2864403cc3986dacde8059e9b011e966d31d600031d50abeefa611bdbf98b856"
+  },
+  "generated_patch": {
+    "ips_bytes": 353,
+    "ips_sha256": "093f5520505102ff2de48cbe02c26de7f5e4ce279da4e93e13ba491d1c63c2bb",
+    "private_exheader_sha256": "2293c737fb36032c58dd4ef530415ad6441759a9ee0298e7f1ad83d66d4aec21",
+    "added_text_bytes": 304,
+    "extended_text_size": "0x479740",
+    "added_code_sha256": "c48d0ec0fd58722ee9b8f29c817f79f63c0ce5ba0ebab488b28bd79cac4132be",
+    "owned_volatile_page": "0x006AF000",
+    "trace_slots": ["0x006AF040", "0x006AF080", "0x006AF0C0"]
+  },
+  "runs": [
+    {
+      "profile": "local/oras/profiles/oras-connector-oqa0xnn9",
+      "status": "complete",
+      "raw_slots_captured": false,
+      "before_backup": "local/oras/backups/before-connector-amrjsi36",
+      "after_backup": "local/oras/backups/after-connector-uo8n44n2"
+    },
+    {
+      "profile": "local/oras/profiles/oras-connector-yiejbj3i",
+      "status": "complete",
+      "raw_slots_captured": true,
+      "before_backup": "local/oras/backups/before-connector-1au3d02d",
+      "after_backup": "local/oras/backups/after-connector-03faex2z"
+    }
+  ],
+  "per_run": {
+    "connections": 2,
+    "submitted_reads_including_skipped": 20,
+    "connector_writes": 0,
+    "guards": 4,
+    "skipped_reads": 2,
+    "native_save_actions": 0,
+    "save_and_metadata_unchanged": true,
+    "inventory_and_full_event_work_match_seed": true,
+    "exit_code": 0
+  },
+  "archive_format_metadata": {
+    "number_directories": 1,
+    "number_files": 1,
+    "actual_quota_enforcement_verified": false,
+    "format_is_nondestructive_migration": false
+  },
+  "multi_file_archives_rejected_by_current_snapshot_and_seed_tools": true,
+  "all_four_before_after_snapshots_verified": true,
+  "targeted_native_calls_observed": true,
+  "full_instruction_trace": false,
+  "second_record_registered": false,
+  "persistent_ap_storage_allocated": false,
+  "block47_write_allowed": false,
+  "next_delivery_index": null,
+  "live_delivery_enabled": false,
+  "unit_tests_passed": 220
+}

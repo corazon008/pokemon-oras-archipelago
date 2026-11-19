@@ -54,6 +54,36 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(validate_snapshot(first, ROM)["save_sha256"],
                              validate_snapshot(second, ROM)["save_sha256"])
 
+    def test_extra_archive_files_or_directories_cannot_be_silently_omitted(self):
+        for kind in ("file", "directory"):
+            with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+                root = Path(directory)
+                source = make_save(root / "source")
+                extra = source.parent / "ap-ledger"
+                if kind == "file":
+                    extra.write_bytes(b"must preserve")
+                else:
+                    extra.mkdir()
+                before = source.read_bytes()
+                with self.assertRaisesRegex(ValueError, "multi-file archive"):
+                    snapshot_save(source, TITLE, ROM, "test", root / "backups")
+                target = root / "target/00000001/main"
+                with self.assertRaisesRegex(ValueError, "multi-file archive"):
+                    runner.seed_archive(source, target)
+                self.assertFalse(target.parent.exists())
+                self.assertFalse((root / "backups").exists())
+                self.assertEqual(source.read_bytes(), before)
+                self.assertTrue(extra.exists())
+
+    def test_snapshot_with_unmanifested_sidecar_is_not_recoverable(self):
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            root = Path(directory)
+            source = make_save(root / "source")
+            snapshot = snapshot_save(source, TITLE, ROM, "test", root / "backups")
+            (snapshot / "00000001/ap-ledger").write_bytes(b"unmanifested")
+            with self.assertRaisesRegex(ValueError, "multi-file archive"):
+                validate_snapshot(snapshot, ROM)
+
     def test_invalid_save_does_not_publish_backup(self):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             root = Path(directory)

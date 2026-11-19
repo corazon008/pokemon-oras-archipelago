@@ -26,7 +26,7 @@ def require_words(info, image, address, expected):
 
 
 def analyze_lifecycle(info, image):
-    # Independent source-record lookup: count at +8, records pointer at +12,
+    # Independent source-record lookup: capacity at +8, records pointer at +12,
     # index*3 followed by index<<4 => 48-byte records.
     require_words(info, image, 0x45D66C, [0xE5903008])
     require_words(info, image, 0x45D684, [0xC59C400C])
@@ -50,7 +50,7 @@ def analyze_lifecycle(info, image):
     require_words(info, image, 0x45DBC8, [0xE1A02008, 0xE1A01005])
     return {
         "source_record_lookup": 0x45D664,
-        "controller_record_count_offset": 8, "controller_records_pointer_offset": 12,
+        "controller_record_capacity_offset": 8, "controller_records_pointer_offset": 12,
         "source_record_stride": 48,
         "raw_io_result_store": 0x45D244, "raw_io_result_offset": 24,
         "raw_result_is_safe_write_flag_proven": False,
@@ -91,17 +91,18 @@ def bind_controller_capture(capture, references, manager_base):
         offset = controller - row["context_start"]
         if offset < 0 or offset + 32 > len(context):
             continue
-        engine, _, count, pointer = struct.unpack_from("<4I", context, offset)
+        engine, registered, capacity, pointer = struct.unpack_from("<4I", context, offset)
         types = [entry for entry in row["context_type_candidates"]
                  if entry["context_address"] == engine
                  and entry["static_mangled_type_name"] == "N3gfl2fs12BackupSystemE"]
         if len(types) != 1:
             continue
-        if pointer != record or count != 1:
+        if pointer != record or registered != 1 or capacity != 1:
             raise ValueError("Captured source-record controller differs from lookup layout")
         candidates.append({
             "controller_prefix": controller, "backup_system_pointer": engine,
-            "source_record_count": count, "source_records_pointer": pointer,
+            "source_registered_count": registered, "source_record_capacity": capacity,
+            "source_records_pointer": pointer,
             "source_record": record, "source_manager_pointer": manager_base,
             "declared_file_size": SAVE_SIZE, "path": path,
             "raw_result_byte_address": controller + 24, "raw_result_byte": context[offset + 24],

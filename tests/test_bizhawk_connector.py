@@ -286,6 +286,16 @@ class ProtocolTests(unittest.TestCase):
                     API(bad), Process(), 1, CodeReference(0x100000, expected), {"memory_read_requests": 0},
                     bootstrap_references=references,
                 ))
+        audit = {"memory_read_requests": 0, "bootstrap": {
+            "mode": "registration-trace", "registration_trace": {"hooks": []},
+        }}
+        with patch("oras_save_registration.read_registration_trace",
+                   side_effect=[{"capacity": 1}, {"capacity": 2}]):
+            with self.assertRaisesRegex(ValueError, "trace changed after reconnect"):
+                asyncio.run(probe.exercise_connector(
+                    API(), Process(), 1, CodeReference(0x100000, expected), audit,
+                    bootstrap_references=references,
+                ))
 
     def test_bootstrap_rechecks_require_code_and_audit(self):
         for code, audit, refs in ((None, {}, [CodeReference(1, b"x")]),

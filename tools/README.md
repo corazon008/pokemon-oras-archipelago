@@ -342,6 +342,19 @@ reconnexion. `memory_write_requests = 0` compte les requêtes du connecteur :
 Ce n'est ni un ledger persistant ni une autorisation de livraison ; le bloc 47
 reste interdit. Voir le [rapport 023](../docs/reports/023-native-bootstrap-and-owned-ram.md).
 
+Le mode `--experimental-bootstrap registration-trace` intercepte en plus
+constructeur, entrée et retour de l'enregistrement natif de `main`. Les logs
+restent dans la page RAM ajoutée et sont relus avant/après reconnexion ;
+captures privées sous `registration-trace/connection-*`. Il ne crée pas de
+second record ni de fichier AP. Voir le
+[rapport 024](../docs/reports/024-native-save-registration-trace.md).
+
+**Limite des backups/imports actuels : archive mono-fichier uniquement.**
+Tout autre fichier ou sous-répertoire à côté de `main` provoque un refus, pas
+une copie tronquée ni une suppression. Un futur ledger séparé nécessitera un
+schéma de snapshot complet. Le formatage natif Encore supprime le répertoire
+de sauvegarde : ne pas l'utiliser comme migration en place.
+
 ## Identité ROM et preuve de lecture
 
 ```sh
