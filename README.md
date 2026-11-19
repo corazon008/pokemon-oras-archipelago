@@ -87,6 +87,9 @@ Avancées du 18 novembre :
   post-SAVE observée ; pas de réparation en place ni de replay.
 - Interruption réelle du processus entre les writers : `main` modifié, 58 CRC
   valides, `aptest` ancien. Paire refusée ; reprise pré-SAVE vérifiée sur copie.
+- Journal client v2 : checkpoint de reprise enregistré avec chaque intention,
+  avant tout appel d'écriture. Rollback ou demi-écriture bloque la livraison ;
+  validation hors ligne uniquement.
 
 ## Documents
 
@@ -122,6 +125,7 @@ Avancées du 18 novembre :
 - [SAVE et cold reload du sidecar — rapport 027](docs/reports/027-native-sidecar-save-reload.md).
 - [Détection des paires hybrides et récupération — rapport 028](docs/reports/028-sidecar-pair-recovery.md).
 - [Interruption entre les writers — rapport 029](docs/reports/029-interrupted-native-save.md).
+- [Intentions liées aux checkpoints — rapport 030](docs/reports/030-checkpoint-bound-delivery-intent.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

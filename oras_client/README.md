@@ -8,7 +8,8 @@ Do not substitute the research Potion probe for a delivery adapter.
 
 - `game_interface.py`: immutable identity/payload/receipt types and abstract
   `GameInterface`.
-- `delivery.py`: SQLite queue and conservative delivery coordinator.
+- `delivery.py`: SQLite queue, durable checkpoint-bound intents and conservative
+  delivery coordinator.
 - `../tests/test_delivery.py`: synthetic backend implementing a hypothetical
   atomic game-side ledger. That ledger has **not** been identified in ORAS.
 
@@ -25,7 +26,8 @@ pending -> submitted -> ram_ack -> committed
               +-> uncertain+
 ```
 
-- Intent is committed to SQLite before calling an adapter that could modify RAM.
+- The exact pre-write anchor and originating runtime epoch commit to SQLite
+  in the same transaction that claims the delivery, before calling `apply`.
 - Only the first uncommitted index can be claimed.
 - Identical packet replays are no-ops; conflicts and gaps are rejected.
 - Every state except `pending` blocks another application.
@@ -35,6 +37,36 @@ pending -> submitted -> ram_ack -> committed
 - `confirm_saved()` only reads a persistence proof; it never presses SAVE.
 - A valid proof can reconcile submitted/uncertain/RAM-acknowledged work.
 - No proof means wait/investigate, **not** permission to resend.
+
+## Checkpoint binding
+
+The initial anchor is explicit at journal creation. It contains hashes of
+`main`, the sidecar, archive metadata and the complete archive tree, plus an
+opaque reference to a recoverable snapshot. The journal never follows that
+reference as a path. After the first commit, only the preceding delivery's
+committed post-save anchor is accepted as the next baseline. The adapter has
+to verify the loaded checkpoint and the referenced snapshot; values with
+the right syntax alone do not pass the contract.
+
+RAM and post-SAVE receipts must identify the exact intent and delivery.
+The post-SAVE receipt must also match the currently loaded checkpoint and
+current runtime epoch. Both data files must differ from the pre-write pair
+and archive metadata must match. This is a necessary change check, **not**
+proof of order or causality. The hypothetical adapter must establish that
+the exact item and index were saved together and verify the post-write
+snapshot before the journal advances. It may reconcile across a cold boot
+only from proof tied to the newly observed epoch.
+
+Missing snapshots, unknown checkpoints, either half of a split SAVE, or a
+rollback block progression even if an index looks right. An unsaved or
+rolled-back in-flight delivery stays unsettled. There is no automatic
+re-anchoring if ordinary gameplay saves change the archive between deliveries.
+
+This contract uses journal schema **v2**. A new journal requires
+`initial_anchor=...`; reopening reads the existing anchor and refuses to
+replace it. Schema v1 is refused unchanged. It cannot be migrated safely by
+inventing historical checkpoints; preserve existing files and do not create
+a substitute queue to force replay.
 
 The journal uses SQLite transactions, `synchronous=FULL`, a private database
 file, and parent-directory synchronization on creation. Passing `None` as its
@@ -68,10 +100,13 @@ and recording an acknowledgment.
 Frame-level [native-save research](../docs/reports/021-native-save-observation.md)
 observed a CRC-invalid backing-file sample between valid initial/final saves.
 A UI success message or matching RAM is therefore not a durable receipt.
-No crash recovery, filesystem atomicity or nonzero AP ledger persistence has
-been established. The experimental cold reload used an explicit fixed clock
-on an isolated copy; an unknown EventWork tail byte varies with time context
-and is neither masked nor repurposed as AP storage.
+The [inter-file interruption](../docs/reports/029-interrupted-native-save.md)
+then left a CRC-valid updated `main` paired with the old test sidecar. A fresh
+fork of the old checkpoint booted, but that was rollback, not AP recovery.
+Filesystem atomicity and item/index persistence are not established. The
+experimental cold reload used an explicit fixed clock on an isolated copy;
+an unknown EventWork tail byte varies with time context and is neither masked
+nor repurposed as AP storage.
 
 The [research recovery fork](../docs/reports/022-recovery-forks-and-load-reset.md)
 boots a verified older snapshot in a new profile only. It does not establish AP
@@ -87,3 +122,5 @@ in for a delivery index: consumption, native gifts and rollback change quantity.
 This stage favors stopping over duplication. There is no automatic retry even
 after a known item rejection, and no automatic rollback/recovery writer.
 Exactly-once delivery **in the actual game has not been demonstrated**.
+See [report 030](../docs/reports/030-checkpoint-bound-delivery-intent.md) for
+offline checkpoint tests and remaining limits.
