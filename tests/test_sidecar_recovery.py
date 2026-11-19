@@ -133,7 +133,10 @@ class SidecarRecoveryTests(unittest.TestCase):
                 load_witness(path)
 
     def test_reload_cli_requires_witness_and_other_modes_reject_it(self):
-        for mode, extra in (("sidecar-reload", []), ("sidecar-load", ["--sidecar-save-result", "result.json"])):
+        for mode, extra in (
+            ("sidecar-reload", []), ("sidecar-interrupt", []), ("sidecar-rollback", []),
+            ("sidecar-load", ["--sidecar-save-result", "result.json"]),
+        ):
             run = subprocess.run(
                 [sys.executable, str(ROOT / "tools/run_bizhawk_connector_probe.py"), "--rom", "unused",
                  "--seed-save", "unused", "--experimental-bootstrap", mode, *extra],

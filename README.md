@@ -85,6 +85,8 @@ Avancées du 18 novembre :
 - Fork du sidecar : les paires `main`/`aptest` hybrides sont refusées avant
   boot malgré des CRC et manifestes valides. Rechargement réservé à la paire
   post-SAVE observée ; pas de réparation en place ni de replay.
+- Interruption réelle du processus entre les writers : `main` modifié, 58 CRC
+  valides, `aptest` ancien. Paire refusée ; reprise pré-SAVE vérifiée sur copie.
 
 ## Documents
 
@@ -119,6 +121,7 @@ Avancées du 18 novembre :
 - [Enregistrement et lecture du sidecar natif — rapport 026](docs/reports/026-native-sidecar-load.md).
 - [SAVE et cold reload du sidecar — rapport 027](docs/reports/027-native-sidecar-save-reload.md).
 - [Détection des paires hybrides et récupération — rapport 028](docs/reports/028-sidecar-pair-recovery.md).
+- [Interruption entre les writers — rapport 029](docs/reports/029-interrupted-native-save.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

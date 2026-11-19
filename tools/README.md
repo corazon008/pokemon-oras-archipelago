@@ -413,6 +413,35 @@ repartir en lecture seule ; pas de fusion ou réparation en place. Le résultat
 local doit être fiable : il n'est ni signé ni un reçu AP. Voir le
 [rapport 028](../docs/reports/028-sidecar-pair-recovery.md).
 
+### Interrompre le processus entre les deux writers (OR, sur copie)
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --seed-save local/oras/backups/before-connector-cx97hc_i/00000001/main \
+  --sidecar-save-result local/oras/profiles/oras-connector-3v319yju/result.json \
+  --experimental-bootstrap sidecar-interrupt \
+  --initial-time 2026-11-18T18:36:36 --speed 400 --timeout 100
+```
+
+Ce mode **tue l'instance EmuHawk lancée par cette commande**. Un point d'arrêt
+instrumenté retient le thread invité après le retour zéro du writer `main`,
+avant la mutation du marqueur et l'appel du writer `aptest`. Le lanceur vérifie
+l'état de la barrière et le buffer via le connecteur avant `SIGKILL`.
+Un timeout ou une sortie inattendue est un échec, pas une mesure d'interruption.
+L'archive résultante reste dans le profil privé à titre de preuve ; aucun
+snapshot post-interruption n'est publié comme backup.
+
+Pour repartir du **checkpoint pré-SAVE intact**, reprendre la commande avec
+`sidecar-rollback` au lieu de `sidecar-interrupt`, sans changer le snapshot
+source. Ce second profil n'a que le hook de lecture. La paire témoin pré-SAVE
+doit correspondre avant et après le boot ; aucun fichier de l'essai interrompu
+n'est restauré en place. Une reprise de ce type perd la progression postérieure
+au checkpoint et ne permet pas de rejouer des livraisons.
+Si le contrôle des ports refuse un redémarrage immédiat après `SIGKILL`,
+laisser expirer la connexion en `TIME-WAIT` ; ne pas arrêter d'autre instance.
+Voir le [rapport 029](../docs/reports/029-interrupted-native-save.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

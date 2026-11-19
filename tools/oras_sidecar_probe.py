@@ -113,10 +113,12 @@ class Stub:
         return struct.pack(f"<{len(self.words)}I", *self.words)
 
 
-def build_sidecar(info, image, start, owned_page, *, save_trial=False):
+def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt=False):
     from oras_bootstrap_patch import arm_branch
 
     analyze_registration(info, image)
+    if interrupt and not save_trial:
+        raise ValueError("Interruption requires the native SAVE variant")
     require_words(info, image, READ, [READ_PUSH, 0xE1A04001, 0xE1A05000, 0xE1A06002])
     for site in READ_CALLERS:
         require_words(info, image, site, [arm_branch(site, READ, link=True)])
@@ -180,7 +182,7 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False):
 
     write_status = owned_page + 0x60
     if save_trial:
-        emit_save_stub(s)
+        emit_save_stub(s, interrupt)
 
     # Interfaces used by the exact-build align/register/read paths. No native
     # manager mutation/validation callbacks installed for this test object.
@@ -238,10 +240,12 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False):
                 struct.pack("<I", arm_branch(site, s.labels["write"], link=True)),
             ))
         plan.update({"write_hook": s.labels["write"], "write_status": write_status})
+        if interrupt:
+            plan["interrupt_barrier"] = s.labels["park"]
     return records, s.finish(), plan
 
 
-def emit_save_stub(s):
+def emit_save_stub(s, interrupt=False):
     """Run once after main's writer returns 0. Preserve main's result."""
     s.label("write")
     s.literal(12, "status_address")
@@ -269,6 +273,12 @@ def emit_save_stub(s):
     s.literal(12, "write_status_address")
     s.emit(0xE3A00001, 0xE58C0000, 0xE59D1014, 0xE58C1004)  # attempt, caller LR
     s.emit(0xE3E00000, 0xE58C0008)             # sentinel until writer returns
+    if interrupt:
+        # Experiment only: widen the inter-file window. No sidecar mutation
+        # or second writer call can run after this acknowledgement.
+        s.emit(0xE3A00002, 0xE58C000C)         # returned field = parked (not success)
+        s.label("park")
+        s.branch("park")
     s.literal(12, "marker_address")
     s.literal(0, "marker_word")
     s.emit(0xE58C0000, 0xE1A00004, 0xE1A01005)

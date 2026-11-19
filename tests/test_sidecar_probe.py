@@ -30,10 +30,10 @@ CALLERS = tuple(address + 4 for address in READ_CALLERS)
 STATUS = (CONTROLLER, MAIN, 2, 0, 2, CALLERS[0], 0, CALLERS[1], 0)
 
 
-def artifacts(*, save_trial=False):
+def artifacts(*, save_trial=False, interrupt=False):
     info = {"code_segments": [{"address": 0x100000, "image_offset": 0, "size": 0x500000}]}
     with patch("oras_sidecar_probe.analyze_registration"), patch("oras_sidecar_probe.require_words"):
-        return build_sidecar(info, b"", START, PAGE, save_trial=save_trial)
+        return build_sidecar(info, b"", START, PAGE, save_trial=save_trial, interrupt=interrupt)
 
 
 def records_fixture(plan):
@@ -129,6 +129,17 @@ class SidecarTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "clear test marker"):
                 after_save_payload(saved)
 
+    def test_interruption_barrier_is_between_native_writers(self):
+        _, code, plan = artifacts(save_trial=True, interrupt=True)
+        barrier = plan["interrupt_barrier"]
+        self.assertEqual(struct.unpack_from("<I", code, barrier - START)[0], 0xEAFFFFFE)
+        calls = [START + i * 4 for i, (w,) in enumerate(struct.iter_unpack("<I", code))
+                 if w >> 24 == 0xEB and branch_target(w, START + i * 4) == WRITE]
+        self.assertEqual(len(calls), 2)
+        self.assertLess(calls[0], barrier)
+        self.assertGreater(calls[1], barrier)
+        self.assertNotIn("interrupt_barrier", artifacts(save_trial=True)[2])
+
     def test_write_verifier_requires_completed_attempt_and_entire_changed_payload(self):
         _, _, plan = artifacts(save_trial=True)
         expected = PREFIX.ljust(FILE_SIZE, b"\0")
@@ -205,7 +216,7 @@ class SidecarTests(unittest.TestCase):
                 asyncio.run(read_sidecar(API(challenge), None, plan, expected, audit))
 
     def test_cli_disallows_other_save_modes_and_reuse_with_sidecar_modes(self):
-        for mode in ("sidecar-load", "sidecar-save", "sidecar-reload"):
+        for mode in ("sidecar-load", "sidecar-save", "sidecar-reload", "sidecar-interrupt", "sidecar-rollback"):
             for options in (
                 [], ["--session", "old"], ["--seed-save", "seed", "--observe-native-save"],
                 ["--seed-save", "seed", "--experimental-potion-1-to-2"],
