@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-19",
+  "save_result": "local/oras/profiles/oras-connector-3v319yju/result.json",
+  "checkpoints": {
+    "before": "local/oras/backups/before-connector-cx97hc_i",
+    "after": "local/oras/backups/after-connector-ru0nhqh3",
+    "after_tree_sha256": "708a3cd466467f653a32c395c3a744e62f9de469bc66dfdec944ad601629e074"
+  },
+  "rejected": [
+    {
+      "capture": "local/oras/profiles/oras-split-controls-5tn7u5ee/forensic-captures/split-main-before-sidecar-after-zdtxlqzb",
+      "profile": "local/oras/profiles/oras-connector-9gmwf0lb",
+      "classification": "split-main-before-sidecar-after",
+      "generic_snapshot_valid": true,
+      "marker_only_gate_would_accept": true,
+      "emulator_launched": false
+    },
+    {
+      "capture": "local/oras/profiles/oras-split-controls-5tn7u5ee/forensic-captures/split-main-after-sidecar-before-c2czjqx3",
+      "profile": "local/oras/profiles/oras-connector-y3xd8tap",
+      "classification": "split-main-after-sidecar-before",
+      "generic_snapshot_valid": true,
+      "marker_only_gate_would_accept": false,
+      "emulator_launched": false
+    }
+  ],
+  "fork": {
+    "profile": "local/oras/profiles/oras-connector-rospuy9j",
+    "classification": "observed-after",
+    "before_backup": "local/oras/backups/before-connector-uf86wxha",
+    "after_backup": "local/oras/backups/after-connector-nhs4disr",
+    "exit_code": 0,
+    "submitted_reads": 28,
+    "connector_writes": 0,
+    "source_and_fork_unchanged": true,
+    "native_save_hook_installed": false
+  },
+  "interrupted_save_run_performed": false,
+  "cross_file_atomicity_proven": false,
+  "restore_in_place": false,
+  "journal_reset_or_replay_authorized": false,
+  "next_delivery_index": null,
+  "live_delivery_authorized": false,
+  "unit_tests_passed": 243
+}

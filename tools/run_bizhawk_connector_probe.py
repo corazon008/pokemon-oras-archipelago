@@ -352,6 +352,8 @@ def main() -> int:
                         choices=("hook", "allocation-only", "registration-trace",
                                  "sidecar-load", "sidecar-save", "sidecar-reload"),
                         help="Fresh-copy native probes; sidecar modes operate only on an experimental test file")
+    parser.add_argument("--sidecar-save-result", type=Path,
+                        help="Trusted local sidecar-save result.json; required for sidecar-reload")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -383,6 +385,8 @@ def main() -> int:
             parser.error("--experimental-bootstrap requires a fresh seed; no reuse/recovery/writes/scans/custom steps")
         args.read_event_work = True
         args.strict_guards = True
+    if sidecar_reload != (args.sidecar_save_result is not None):
+        parser.error("--sidecar-save-result is required with sidecar-reload and forbidden in other modes")
     if args.recover_from_snapshot:
         if args.seed_save or args.session or args.observe_native_save or args.experimental_potion_1_to_2 or args.steps:
             parser.error("--recover-from-snapshot requires a new read-only profile; no seed/session/SAVE/Potion/custom steps")
@@ -459,6 +463,7 @@ def main() -> int:
         event_reference = None
         bootstrap_references = None
         sidecar_expected = None
+        sidecar_witness = None
         if args.read_code or has_profile:
             identity, code_reference = inspect_rom(rom)
             if identity["edition_from_program_id"] is None or code_reference is None:
@@ -473,6 +478,11 @@ def main() -> int:
             if args.seed_save.name != "main" or args.seed_save.parent.name != "00000001":
                 raise ValueError("Sidecar experiment requires a verified snapshot's 00000001/main")
             recovery_snapshot_reference(args.seed_save.parent.parent, identity)
+        if sidecar_reload:
+            from oras_sidecar_recovery import inspect_pair, load_witness, require_observed_after
+            sidecar_witness = load_witness(args.sidecar_save_result)
+            report["sidecar_recovery"] = inspect_pair(args.seed_save, sidecar_witness)
+            require_observed_after(report["sidecar_recovery"])
         if args.recover_from_snapshot:
             report["recovery_fork"] = recovery_snapshot_reference(args.recover_from_snapshot, identity)
         bundle = session / "connector"
@@ -506,6 +516,8 @@ def main() -> int:
             if sidecar_mode:
                 from oras_sidecar_probe import NAME, load_saved_fixture, stage_fixture, verify_fixture
                 target = save_destination(runtime, identity["program_id"])
+                if sidecar_witness is not None:
+                    require_observed_after(inspect_pair(target, sidecar_witness))
                 sidecar_expected = (load_saved_fixture(target) if sidecar_reload
                                     else stage_fixture(target, save_trial=sidecar_save))
                 report["sidecar_fixture"] = {
@@ -732,6 +744,9 @@ def main() -> int:
                 report["sidecar_fixture"]["archive_tree_after_exit"] = tree
                 if sidecar_save:
                     report["sidecar_fixture"]["native_save_tested"] = True
+                if sidecar_witness is not None:
+                    require_observed_after(inspect_pair(target, sidecar_witness))
+                    report["sidecar_recovery"]["fork_matches_observed_after"] = True
             if args.observe_native_save:
                 from oras_native_save_observation import inspect_observation
                 report["native_observation"].update(inspect_observation(

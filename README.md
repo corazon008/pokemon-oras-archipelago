@@ -82,6 +82,9 @@ Avancées du 18 novembre :
 - Un SAVE natif écrit un marqueur de test dans `aptest` après `main`. Marqueur
   relu après arrêt normal et cold boot ; aucune atomicité inter-fichiers ni
   livraison AP démontrée.
+- Fork du sidecar : les paires `main`/`aptest` hybrides sont refusées avant
+  boot malgré des CRC et manifestes valides. Rechargement réservé à la paire
+  post-SAVE observée ; pas de réparation en place ni de replay.
 
 ## Documents
 
@@ -115,6 +118,7 @@ Avancées du 18 novembre :
 - [Snapshots/imports d'archive complète — rapport 025](docs/reports/025-full-archive-snapshots-and-imports.md).
 - [Enregistrement et lecture du sidecar natif — rapport 026](docs/reports/026-native-sidecar-load.md).
 - [SAVE et cold reload du sidecar — rapport 027](docs/reports/027-native-sidecar-save-reload.md).
+- [Détection des paires hybrides et récupération — rapport 028](docs/reports/028-sidecar-pair-recovery.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

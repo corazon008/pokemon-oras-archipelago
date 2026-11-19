@@ -387,12 +387,31 @@ du sidecar après celui de `main`. La sonde vérifie les octets après SAVE en R
 et sur disque, ainsi que les CRC et l'inventaire/EventWork de `main`.
 
 Pour le cold reload, reprendre la commande avec
-`--seed-save <backup_after_exit>/00000001/main` et
-`--experimental-bootstrap sidecar-reload`. Cette variante n'installe pas le hook
-SAVE et ne recrée pas la fixture. Le marqueur et l'archive complète doivent
-déjà être valides avant boot. Ce test ne prouve ni durabilité après panne ni
-atomicité inter-fichiers, et n'autorise aucun replay AP.
+`--seed-save <backup_after_exit>/00000001/main`,
+`--experimental-bootstrap sidecar-reload` et
+`--sidecar-save-result <profil-du-SAVE>/result.json`. Le résultat local doit
+être celui du **SAVE réussi**, pas du reload. Les deux snapshots pré/post
+référencés par ce résultat doivent rester disponibles. Cette variante
+n'installe pas le hook SAVE et ne recrée pas la fixture. Elle compare les
+deux fichiers et métadonnées à l'observation post-SAVE avant et après boot.
+Ce test ne prouve ni durabilité après panne ni atomicité inter-fichiers,
+et n'autorise aucun replay AP.
 Voir le [rapport 027](../docs/reports/027-native-sidecar-save-reload.md).
+
+Pour classifier une archive candidate au repos sans la modifier :
+
+```sh
+python3 tools/oras_sidecar_recovery.py \
+  --save-result local/oras/profiles/oras-connector-3v319yju/result.json \
+  --archive-main local/oras/backups/after-connector-ru0nhqh3/00000001/main
+```
+
+Une paire hybride peut avoir un manifeste v2 et tous ses CRC valides.
+L'inspection la refuse par rapport au témoin externe de ce SAVE. Si elle
+est refusée, seul un fork **explicitement demandé** du snapshot intact peut
+repartir en lecture seule ; pas de fusion ou réparation en place. Le résultat
+local doit être fiable : il n'est ni signé ni un reçu AP. Voir le
+[rapport 028](../docs/reports/028-sidecar-pair-recovery.md).
 
 ## Identité ROM et preuve de lecture
 
