@@ -361,6 +361,23 @@ Préserver les octets d'un sidecar ne valide ni son index AP ni sa cohérence av
 `main`. Le formatage natif Encore supprime le répertoire de sauvegarde : ne pas
 l'utiliser comme migration en place.
 
+### Sidecar natif expérimental — enregistrement et lecture
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --seed-save local/oras/backups/before-connector-8ny3zimx/00000001/main \
+  --experimental-bootstrap sidecar-load \
+  --initial-time 2026-11-18T18:36:36 --speed 400 --timeout 120
+```
+
+Ce mode prend un snapshot mono-fichier vérifié et prépare `aptest` sur une
+nouvelle copie uniquement. Il enregistre le fichier de test et vérifie ses
+512 octets chargés par le lecteur natif, ainsi que les deux records et les
+retours du lecteur avant/après reconnexion. Le contenu est préparé par l'hôte ;
+aucun SAVE, aucun index ni livraison AP. Ne pas réutiliser le profil patché
+pour jouer. Voir le [rapport 026](../docs/reports/026-native-sidecar-load.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

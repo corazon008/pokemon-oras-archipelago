@@ -45,7 +45,7 @@ def encode_ips(records):
     return bytes(patch + b"EOF")
 
 
-def build_bootstrap(info, image, exheader, hook=True, registration_trace=False):
+def build_bootstrap(info, image, exheader, hook=True, registration_trace=False, sidecar=False):
     """Pure builder, also exercised with synthetic segments. Caller pins ROM hash."""
     if len(exheader) != 0x800:
         raise ValueError("Expected Encore's complete 0x800-byte ExHeader")
@@ -96,7 +96,14 @@ def build_bootstrap(info, image, exheader, hook=True, registration_trace=False):
         owned_address, MAGIC,
     ]
     stub = struct.pack("<10I", *words)
-    trace_records, trace_plan = [], None
+    trace_records, trace_plan, sidecar_plan = [], None, None
+    if sidecar:
+        if not hook or registration_trace:
+            raise ValueError("Sidecar probe requires an isolated bootstrap hook")
+        from oras_sidecar_probe import build_sidecar
+        trace_start = align(stub_address + len(stub), 16)
+        trace_records, trace_code, sidecar_plan = build_sidecar(info, image, trace_start, owned_address)
+        stub += bytes(trace_start - stub_address - len(stub)) + trace_code
     if registration_trace:
         if not hook:
             raise ValueError("Registration trace requires the native bootstrap hook")
@@ -124,7 +131,8 @@ def build_bootstrap(info, image, exheader, hook=True, registration_trace=False):
     references.append(CodeReference(owned_address, MARKER if hook else bytes(8)))
     report = {
         "kind": "oras_encore_bootstrap_v1",
-        "mode": "registration-trace" if registration_trace else "hook" if hook else "allocation-only",
+        "mode": ("sidecar-load" if sidecar else "registration-trace" if registration_trace
+                 else "hook" if hook else "allocation-only"),
         "entry_address": entry, "original_startup_target": original_target,
         "stub_address": stub_address, "stub_size": len(stub),
         "original_text_size": text["size"], "extended_text_size": end - start,
@@ -139,11 +147,15 @@ def build_bootstrap(info, image, exheader, hook=True, registration_trace=False):
     }
     if trace_plan is not None:
         report["registration_trace"] = trace_plan
+    if sidecar_plan is not None:
+        report["sidecar_probe"] = sidecar_plan
+        for offset, data in trace_records:
+            references.append(CodeReference(entry + offset - start, data))
     return encode_ips(records), bytes(changed), CodeReference(entry, prefix), references, report
 
 
 def install_bootstrap(rom: Path, runtime: Path, mode: str):
-    if mode not in ("hook", "allocation-only", "registration-trace") or sha256_file(rom) != OR_HASH:
+    if mode not in ("hook", "allocation-only", "registration-trace", "sidecar-load") or sha256_file(rom) != OR_HASH:
         raise ValueError("Bootstrap experiment requires the exact verified OR build and mode")
     # Never allow adjacent, unaccounted-for overlays on the user's ROM.
     for suffix in (".exheader", ".exefsdir", ".romfs"):
@@ -156,7 +168,7 @@ def install_bootstrap(rom: Path, runtime: Path, mode: str):
         source.seek(info["ncch_offset_bytes"] + 0x200)
         exheader = source.read(0x800)
     ips, header, prefix, references, report = build_bootstrap(
-        info, image, exheader, mode != "allocation-only", mode == "registration-trace",
+        info, image, exheader, mode != "allocation-only", mode == "registration-trace", mode == "sidecar-load",
     )
     mod = runtime / "3DS/User/load/mods" / info["program_id"]
     mod.mkdir(mode=0o700, parents=True, exist_ok=False)

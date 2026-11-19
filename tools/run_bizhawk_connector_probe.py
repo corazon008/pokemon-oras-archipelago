@@ -91,7 +91,8 @@ async def exercise_connector(api, process, timeout: float,
                               event_reference: EventReference | None = None,
                               strict_ready: Path | None = None,
                               object_capture: Path | None = None,
-                              bootstrap_references: list[CodeReference] | None = None) -> list[dict]:
+                              bootstrap_references: list[CodeReference] | None = None,
+                              sidecar_expected: bytes | None = None) -> list[dict]:
     if event_reference is not None and (code_reference is None or audit is None):
         raise ValueError("Event reads require a runtime code guard and audit")
     if object_capture is not None and (strict_ready is None or audit is None):
@@ -176,6 +177,14 @@ async def exercise_connector(api, process, timeout: float,
                     if exchanges and trace != exchanges[0]["registration_trace"]:
                         raise ValueError("Native registration trace changed after reconnect")
                     exchange["registration_trace"] = trace
+                if sidecar_expected is not None:
+                    from oras_sidecar_probe import read_sidecar
+                    sidecar = await read_sidecar(
+                        api, context, audit["bootstrap"]["sidecar_probe"], sidecar_expected, audit,
+                    )
+                    if exchanges and sidecar != exchanges[0]["sidecar_probe"]:
+                        raise ValueError("Native sidecar evidence changed after reconnect")
+                    exchange["sidecar_probe"] = sidecar
             if object_reference is not None:
                 audit["memory_read_requests"] += 1
                 payloads = await api.read(context, [
@@ -323,8 +332,9 @@ def main() -> int:
     parser.add_argument("--observe-native-save", action="store_true",
                         help="Frame-sample one native SAVE; requires a fresh --seed-save copy, no memory writes")
     parser.add_argument("--initial-time", help="Explicit emulated RTC time (ISO 8601); fresh seeded copies only")
-    parser.add_argument("--experimental-bootstrap", choices=("hook", "allocation-only", "registration-trace"),
-                        help="Fresh-copy native startup marker in an explicitly added volatile BSS page; no ledger")
+    parser.add_argument("--experimental-bootstrap",
+                        choices=("hook", "allocation-only", "registration-trace", "sidecar-load"),
+                        help="Fresh-copy native probes; sidecar-load only registers/reads a test file, no ledger")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -424,6 +434,7 @@ def main() -> int:
         inventory_reference = None
         event_reference = None
         bootstrap_references = None
+        sidecar_expected = None
         if args.read_code or has_profile:
             identity, code_reference = inspect_rom(rom)
             if identity["edition_from_program_id"] is None or code_reference is None:
@@ -431,6 +442,13 @@ def main() -> int:
             identity["rom_sha256"] = sha256_file(rom)
             report["rom_identity"] = identity
             report["scope"] = "TCP metadata and ROM-derived code-prefix reads only"
+        if args.experimental_bootstrap == "sidecar-load":
+            from oras_save_objects import OR_HASH
+            if identity["rom_sha256"] != OR_HASH:
+                raise ValueError("Sidecar load requires the exact verified OR build")
+            if args.seed_save.name != "main" or args.seed_save.parent.name != "00000001":
+                raise ValueError("Sidecar load requires a verified snapshot's 00000001/main")
+            recovery_snapshot_reference(args.seed_save.parent.parent, identity)
         if args.recover_from_snapshot:
             report["recovery_fork"] = recovery_snapshot_reference(args.recover_from_snapshot, identity)
         bundle = session / "connector"
@@ -460,6 +478,19 @@ def main() -> int:
                 report["archive"] = archive
                 if (archive["archive_file_count"] > 1 or archive["archive_directory_count"]) and not args.recover_from_snapshot:
                     raise ValueError("Multi-file archive boot requires an explicit read-only recovery fork")
+            if args.experimental_bootstrap == "sidecar-load":
+                from oras_sidecar_probe import NAME, stage_fixture, verify_fixture
+                target = save_destination(runtime, identity["program_id"])
+                sidecar_expected = stage_fixture(target)
+                report["sidecar_fixture"] = {
+                    "name": NAME,
+                    "length": len(sidecar_expected),
+                    "sha256": hashlib.sha256(sidecar_expected).hexdigest(),
+                    "archive_tree_before_boot": verify_fixture(target, sidecar_expected),
+                    "host_seeded": True,
+                    "native_save_tested": False,
+                    "persistent_ap_ledger_implemented": False,
+                }
             report["save_sha256_before_launch"] = sha256(save_destination(runtime, identity["program_id"]))
             report["backup_before_launch"] = backup_existing_save(
                 save_destination(runtime, identity["program_id"]),
@@ -486,6 +517,8 @@ def main() -> int:
             if args.experimental_bootstrap == "registration-trace":
                 report["registration_trace_capture"] = str(session / "registration-trace")
                 report["scope"] = "Experimental native constructor/registration trace; no SAVE or AP record"
+            if sidecar_expected is not None:
+                report["scope"] = "Experimental native sidecar registration and load; no SAVE or delivery"
         wrapper = bundle / "probe.lua"
         shutil.copyfile(PROJECT_ROOT / "tools/bizhawk_connector_probe.lua", wrapper)
         stop_file = session / "stop"
@@ -596,6 +629,7 @@ def main() -> int:
                             strict_ready,
                             objects if args.scan_save_objects else None,
                             bootstrap_references,
+                            sidecar_expected,
                         ),
                         timeout=args.timeout,
                     )
@@ -648,6 +682,12 @@ def main() -> int:
                 report["save_unchanged"] = sha256(target) == report["save_sha256_before_launch"]
                 if not report["save_unchanged"]:
                     raise ValueError("Save file changed during read-only probe")
+            if sidecar_expected is not None:
+                from oras_sidecar_probe import verify_fixture
+                tree = verify_fixture(target, sidecar_expected)
+                if tree != report["sidecar_fixture"]["archive_tree_before_boot"]:
+                    raise ValueError("Experimental sidecar archive changed during boot")
+                report["sidecar_fixture"]["archive_unchanged_after_boot"] = True
             if args.observe_native_save:
                 from oras_native_save_observation import inspect_observation
                 report["native_observation"].update(inspect_observation(

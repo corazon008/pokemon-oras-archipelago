@@ -231,6 +231,8 @@ def main() -> int:
         manifest = json.loads((session / "profile.json").read_text())
         if manifest.get("kind") != "oras_native_save_probe" or manifest.get("rom_sha256") != rom_hash:
             parser.error("Profile/ROM identity mismatch")
+        if manifest.get("experimental_bootstrap"):
+            parser.error("Experimental bootstrap profiles cannot be reused for native play")
         if manifest.get("archive_file_count", 1) > 1 or manifest.get("archive_directory_count", 0):
             parser.error("Multi-file archives require a read-only connector recovery fork")
         runtime = session / "runtime"

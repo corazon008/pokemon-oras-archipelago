@@ -76,6 +76,9 @@ Avancées du 18 novembre :
 - Snapshots v2 d'archive complète et imports vérifiés : trois fichiers/deux dossiers
   conservés après cold boot ; sidecar altéré refusé avant lancement. Fixtures
   inertes uniquement, toujours aucun ledger AP enregistré par le jeu.
+- Sur OR patché, `data:/aptest` est enregistré puis lu nativement dans la RAM
+  ajoutée, vérifié sur deux boots avec des contenus distincts. Fichier de test
+  préparé côté hôte ; aucun SAVE ni index AP persistant validé.
 
 ## Documents
 
@@ -107,6 +110,7 @@ Avancées du 18 novembre :
 - [Bootstrap natif et RAM ajoutée — rapport 023](docs/reports/023-native-bootstrap-and-owned-ram.md).
 - [Trace native de l'enregistrement des fichiers — rapport 024](docs/reports/024-native-save-registration-trace.md).
 - [Snapshots/imports d'archive complète — rapport 025](docs/reports/025-full-archive-snapshots-and-imports.md).
+- [Enregistrement et lecture du sidecar natif — rapport 026](docs/reports/026-native-sidecar-load.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

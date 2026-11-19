@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-19",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "seed_snapshot": "local/oras/backups/before-connector-8ny3zimx",
+  "seed_main_sha256": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887",
+  "seed_metadata_sha256": "24bb7e7f2835b4a0306d8ef31cb0ff1a37776ee7e8a591efe71e1046c78c4499",
+  "emulated_initial_time": "2026-11-18T18:36:36",
+  "registered_paths": ["data:/main", "data:/aptest"],
+  "registered_count": 2,
+  "allocated_capacity": 2,
+  "metadata_number_files_on_copy": 2,
+  "sidecar_bytes": 512,
+  "sidecar_ram": "0x006AF200",
+  "native_read_return_addresses": ["0x0045D3D8", "0x00124D80"],
+  "native_read_results": [0, 0],
+  "ips_sha256": "46bc2b5a799b3baf415b1e4940c19f40938ea7add33d1d23a2deef85b8d0860a",
+  "first_attempt": {
+    "profile": "local/oras/profiles/oras-connector-_i_5mw4w",
+    "status": "failed",
+    "reason": "Verifier expected one read; it observed two. Full RAM payload not validated.",
+    "last_native_read_result": 0
+  },
+  "successful_runs": [
+    {
+      "profile": "local/oras/profiles/oras-connector-x3vps5ho",
+      "payload_sha256": "92f5be54c01183abd22eb67878483687036acb14aad8fd564145a33cacf85e28",
+      "archive_tree_sha256": "c483687528f6ddecb89b91cb2b12ad3085d88d2ed7ab9b46a0eb0a213063d985",
+      "before_backup": "local/oras/backups/before-connector-8jk_41u5",
+      "after_backup": "local/oras/backups/after-connector-qsxtycty"
+    },
+    {
+      "profile": "local/oras/profiles/oras-connector-0haqvoml",
+      "payload_sha256": "c15c29e9b649fcf6182a6e8248e4410a598b3b0bdc3ae7547a0faf23977bb548",
+      "archive_tree_sha256": "345c781039e2ae9937d659c3afa30ed7f9e7e7a79cfe5ade033afc475701b980",
+      "before_backup": "local/oras/backups/before-connector-tcnqzvn1",
+      "after_backup": "local/oras/backups/after-connector-647sc_gz"
+    }
+  ],
+  "per_success": {
+    "connections": 2,
+    "submitted_reads": 28,
+    "reads_skipped_by_guards": 2,
+    "guards": 4,
+    "connector_writes": 0,
+    "archive_unchanged_after_boot": true,
+    "source_archive_unchanged": true,
+    "exit_code": 0
+  },
+  "sidecar_seeded_by_host": true,
+  "native_save_tested": false,
+  "missing_sidecar_in_game_tested": false,
+  "ledger_implemented": false,
+  "ap_index": null,
+  "live_delivery_authorized": false,
+  "unit_tests_passed": 236
+}
