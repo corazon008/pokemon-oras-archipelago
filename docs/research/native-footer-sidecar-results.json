@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "seed": "local/oras/backups/before-connector-8ny3zimx",
+  "native_footer_payload_bytes": 488,
+  "footer_offset_in_main": "0x75E00",
+  "footer_offset_in_sidecar": 20,
+  "saved_marker_offset_in_sidecar": 508,
+  "footer_before_sha256": "b84f3fca87cadf1cebcf3d1e4a633f72ffd5f8b1d1d52c53a04f7e1dfd3c39fb",
+  "footer_after_sha256": "4edfcc98d795e34b826b2b71473874c68340b461737d512c3a68cd17937972d4",
+  "saved_main_sha256": "31af0c4851ef2251274bb7c262844c5765f7bdd44686453b4166a76c0c1758c8",
+  "saved_payload_sha256": "1d0c3c8fcbad69b157f72f516170eee52632eceae3c34b2e276361318ede04d6",
+  "saved_archive_tree_sha256": "c149b02e7b018abbbe0cb25236eec8f3e7d274d55edd2f51e42dfa42624b1527",
+  "save": {
+    "profile": "local/oras/profiles/oras-connector-t03fjp0_",
+    "before_backup": "local/oras/backups/before-connector-8012homq",
+    "after_backup": "local/oras/backups/after-connector-fab0iiua",
+    "writer_status_hex": "01000000544e12000000000001000000",
+    "exit_code": 0,
+    "submitted_reads": 39,
+    "connector_writes": 0
+  },
+  "cold_reload": {
+    "profile": "local/oras/profiles/oras-connector-ea0xy9y2",
+    "before_backup": "local/oras/backups/before-connector-wk1v2gle",
+    "after_backup": "local/oras/backups/after-connector-vu7undue",
+    "exit_code": 0,
+    "submitted_reads": 28,
+    "connector_writes": 0,
+    "native_save_hook_installed": false,
+    "external_witness_required": false
+  },
+  "mismatch_control": {
+    "snapshot": "local/oras/profiles/oras-footer-mismatch-ht_0lyon/forensic/mixed-footer-evidence-ovy9qr2a",
+    "profile": "local/oras/profiles/oras-connector-7vqalg81",
+    "valid_main_crcs": 58,
+    "generic_snapshot_valid": true,
+    "marker_present": true,
+    "emulator_launched": false
+  },
+  "coherent_rollback_detected_by_footer_alone": false,
+  "cross_file_atomicity_proven": false,
+  "inventory_changed": false,
+  "next_delivery_index": null,
+  "live_delivery_authorized": false,
+  "unit_tests_passed": 261
+}

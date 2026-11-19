@@ -442,6 +442,29 @@ Si le contrôle des ports refuse un redémarrage immédiat après `SIGKILL`,
 laisser expirer la connexion en `TIME-WAIT` ; ne pas arrêter d'autre instance.
 Voir le [rapport 029](../docs/reports/029-interrupted-native-save.md).
 
+### Variante expérimentale avec footer embarqué
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --seed-save local/oras/backups/before-connector-8ny3zimx/00000001/main \
+  --experimental-bootstrap sidecar-footer-save \
+  --initial-time 2026-11-18T18:36:36 --speed 400 --timeout 120
+```
+
+Cette variante de `aptest` est distincte du challenge aléatoire : le writer
+natif copie 488 octets du footer de `main` après son écriture, avant celle
+du sidecar. `sidecar-footer-reload` prend le `main` du snapshot post-SAVE
+comme seed, sans `--sidecar-save-result`, et vérifie la paire complète avant
+de lancer un nouveau profil sans writer. Pour examiner ses fichiers au
+repos sans boot, utiliser `python3 tools/oras_footer_binding.py <archive>/main`.
+
+La comparaison constate une divergence de footers, pas un âge, une identité
+ou une transaction. Un rollback des deux fichiers ensemble, une collision
+des CRC ou une paire reconstruite côté hôte ne sont pas exclus. Ne pas
+utiliser cette expérience comme reçu AP.
+Voir le [rapport 031](../docs/reports/031-native-footer-sidecar-binding.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

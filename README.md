@@ -90,6 +90,9 @@ Avancées du 18 novembre :
 - Journal client v2 : checkpoint de reprise enregistré avec chaque intention,
   avant tout appel d'écriture. Rollback ou demi-écriture bloque la livraison ;
   validation hors ligne uniquement.
+- Sur OR patché, le sidecar embarque le footer mis à jour par le SAVE natif.
+  Cold reload sans témoin externe vérifié ; un mélange de footers est refusé,
+  mais pas un rollback cohérent des deux fichiers.
 
 ## Documents
 
@@ -126,6 +129,7 @@ Avancées du 18 novembre :
 - [Détection des paires hybrides et récupération — rapport 028](docs/reports/028-sidecar-pair-recovery.md).
 - [Interruption entre les writers — rapport 029](docs/reports/029-interrupted-native-save.md).
 - [Intentions liées aux checkpoints — rapport 030](docs/reports/030-checkpoint-bound-delivery-intent.md).
+- [Footer natif embarqué dans le sidecar — rapport 031](docs/reports/031-native-footer-sidecar-binding.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

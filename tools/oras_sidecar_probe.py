@@ -30,15 +30,19 @@ SAVE_MARKER = b"ASV1"
 MARKER_OFFSET = FILE_SIZE - len(SAVE_MARKER)
 
 
-def stage_fixture(target: Path, *, save_trial=False):
+def stage_fixture(target: Path, *, save_trial=False, footer=False):
     """Only a probe-owned copy reaches here. Never native-format any archive."""
     files, metadata, tree = capture_stable_archive(target)
     if set(files) != {"main"} or tree["directories"] or metadata != BASE_METADATA:
         raise ValueError("Sidecar experiment requires the known one-file Encore archive")
-    # Random file content cannot be reproduced by the patch or by a zeroed BSS.
-    payload = PREFIX + secrets.token_bytes(FILE_SIZE - len(PREFIX))
-    if save_trial:
-        payload = payload[:MARKER_OFFSET] + bytes(len(SAVE_MARKER))
+    if footer:
+        from oras_footer_binding import footer_payload
+        payload = footer_payload(files["main"], saved=False)
+    else:
+        # Random file content cannot be reproduced by the patch or a zeroed BSS.
+        payload = PREFIX + secrets.token_bytes(FILE_SIZE - len(PREFIX))
+        if save_trial:
+            payload = payload[:MARKER_OFFSET] + bytes(len(SAVE_MARKER))
     write_synced(target.parent / NAME, payload)
     temp = target.parent.with_suffix(".probe-metadata")
     write_synced(temp, TEST_METADATA)
@@ -113,12 +117,17 @@ class Stub:
         return struct.pack(f"<{len(self.words)}I", *self.words)
 
 
-def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt=False):
+def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt=False, footer=False):
     from oras_bootstrap_patch import arm_branch
 
     analyze_registration(info, image)
     if interrupt and not save_trial:
         raise ValueError("Interruption requires the native SAVE variant")
+    if footer:
+        if not save_trial or interrupt:
+            raise ValueError("Footer experiment requires its own native SAVE variant")
+        from oras_footer_binding import verify_footer_getter
+        verify_footer_getter(info, image)
     require_words(info, image, READ, [READ_PUSH, 0xE1A04001, 0xE1A05000, 0xE1A06002])
     for site in READ_CALLERS:
         require_words(info, image, site, [arm_branch(site, READ, link=True)])
@@ -182,7 +191,7 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt
 
     write_status = owned_page + 0x60
     if save_trial:
-        emit_save_stub(s, interrupt)
+        emit_save_stub(s, interrupt, footer)
 
     # Interfaces used by the exact-build align/register/read paths. No native
     # manager mutation/validation callbacks installed for this test object.
@@ -217,6 +226,9 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt
             ("marker_address", buffer + MARKER_OFFSET),
             ("marker_word", int.from_bytes(SAVE_MARKER, "little")),
         ]
+    if footer:
+        from oras_footer_binding import footer_literals
+        literals.extend(footer_literals(buffer))
     for name, address in literals:
         s.label(name)
         s.emit(address)
@@ -242,10 +254,12 @@ def build_sidecar(info, image, start, owned_page, *, save_trial=False, interrupt
         plan.update({"write_hook": s.labels["write"], "write_status": write_status})
         if interrupt:
             plan["interrupt_barrier"] = s.labels["park"]
+        if footer:
+            plan["footer_binding"] = True
     return records, s.finish(), plan
 
 
-def emit_save_stub(s, interrupt=False):
+def emit_save_stub(s, interrupt=False, footer=False):
     """Run once after main's writer returns 0. Preserve main's result."""
     s.label("write")
     s.literal(12, "status_address")
@@ -279,6 +293,9 @@ def emit_save_stub(s, interrupt=False):
         s.emit(0xE3A00002, 0xE58C000C)         # returned field = parked (not success)
         s.label("park")
         s.branch("park")
+    if footer:
+        from oras_footer_binding import emit_footer_copy
+        emit_footer_copy(s)
     s.literal(12, "marker_address")
     s.literal(0, "marker_word")
     s.emit(0xE58C0000, 0xE1A00004, 0xE1A01005)
@@ -377,7 +394,12 @@ async def read_saved_sidecar(api, context, plan, expected, audit):
     status, payload = values
     audit["sidecar_write_status_hex"] = status.hex()
     caller = parse_write_status(status)
-    if payload != after_save_payload(expected):
+    if plan.get("footer_binding"):
+        from oras_footer_binding import HEADER
+        if (len(payload) != FILE_SIZE or not payload.startswith(HEADER)
+                or payload[MARKER_OFFSET:] != SAVE_MARKER or payload == expected):
+            raise ValueError("Missing changed native footer payload in RAM")
+    elif payload != after_save_payload(expected):
         raise ValueError("Native sidecar RAM doesn't match the changed test marker")
     return {"return_address": caller, "native_write_result": 0,
             "payload_sha256": hashlib.sha256(payload).hexdigest()}

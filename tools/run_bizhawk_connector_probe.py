@@ -367,7 +367,7 @@ def main() -> int:
     parser.add_argument("--experimental-bootstrap",
                         choices=("hook", "allocation-only", "registration-trace",
                                  "sidecar-load", "sidecar-save", "sidecar-reload", "sidecar-interrupt",
-                                 "sidecar-rollback"),
+                                 "sidecar-rollback", "sidecar-footer-save", "sidecar-footer-reload"),
                         help="Fresh-copy native probes; sidecar modes operate only on an experimental test file")
     parser.add_argument("--sidecar-save-result", type=Path,
                         help="Trusted local sidecar-save result.json; required for reload/interruption")
@@ -385,9 +385,12 @@ def main() -> int:
     args = parser.parse_args()
     interrupt = args.experimental_bootstrap == "sidecar-interrupt"
     rollback = args.experimental_bootstrap == "sidecar-rollback"
+    footer_save = args.experimental_bootstrap == "sidecar-footer-save"
+    footer_reload = args.experimental_bootstrap == "sidecar-footer-reload"
     before_pair = interrupt or rollback
-    sidecar_mode = args.experimental_bootstrap in ("sidecar-load", "sidecar-save", "sidecar-reload") or before_pair
-    sidecar_save = args.experimental_bootstrap == "sidecar-save" or interrupt
+    sidecar_mode = (args.experimental_bootstrap in ("sidecar-load", "sidecar-save", "sidecar-reload")
+                    or before_pair or footer_save or footer_reload)
+    sidecar_save = args.experimental_bootstrap == "sidecar-save" or interrupt or footer_save
     sidecar_reload = args.experimental_bootstrap == "sidecar-reload"
     source, rom = args.bizhawk.resolve(), args.rom.resolve()
     if platform.system() != "Linux" or platform.machine() != "x86_64":
@@ -440,7 +443,7 @@ def main() -> int:
         parser.error("--strict-guards requires --read-code or a validated profile")
     try:
         default_steps = BOOT_GAMEPLAY_STEPS if args.read_event_work else BOOT_MEDICINE_STEPS
-        if sidecar_save or sidecar_reload or rollback:
+        if sidecar_save or sidecar_reload or rollback or footer_reload:
             # The sidecar-patched seed is still on Continue after the generic boot plan.
             default_steps += ",2:A,600:-"
         steps = parse_steps(args.steps or default_steps)
@@ -498,6 +501,10 @@ def main() -> int:
             if args.seed_save.name != "main" or args.seed_save.parent.name != "00000001":
                 raise ValueError("Sidecar experiment requires a verified snapshot's 00000001/main")
             recovery_snapshot_reference(args.seed_save.parent.parent, identity)
+        if footer_save or footer_reload:
+            from oras_footer_binding import inspect_footer_archive
+        if footer_reload:
+            _, report["sidecar_footer_source"] = inspect_footer_archive(args.seed_save)
         if sidecar_reload or before_pair:
             from oras_sidecar_recovery import inspect_pair, load_witness, require_observed_after
             sidecar_witness = load_witness(args.sidecar_save_result)
@@ -535,12 +542,16 @@ def main() -> int:
                 )
                 report["archive"] = archive
                 if ((archive["archive_file_count"] > 1 or archive["archive_directory_count"])
-                        and not (args.recover_from_snapshot or sidecar_reload or before_pair)):
+                        and not (args.recover_from_snapshot or sidecar_reload or before_pair or footer_reload)):
                     raise ValueError("Multi-file archive boot requires explicit read-only recovery or sidecar reload")
             if sidecar_mode:
                 from oras_sidecar_probe import NAME, load_saved_fixture, stage_fixture, verify_fixture
                 target = save_destination(runtime, identity["program_id"])
-                if before_pair:
+                if footer_reload:
+                    sidecar_expected, bound = inspect_footer_archive(target)
+                    if bound != report["sidecar_footer_source"]:
+                        raise ValueError("Imported native footer pair differs from source")
+                elif before_pair:
                     from oras_sidecar_probe import after_save_payload
                     files, _, _ = capture_stable_archive(target)
                     sidecar_expected = files[NAME]
@@ -551,13 +562,19 @@ def main() -> int:
                     require_observed_after(inspect_pair(target, sidecar_witness))
                     sidecar_expected = load_saved_fixture(target)
                 else:
-                    sidecar_expected = stage_fixture(target, save_trial=sidecar_save)
+                    sidecar_expected = stage_fixture(target, save_trial=sidecar_save, footer=footer_save)
+                if footer_save or footer_reload:
+                    _, bound = inspect_footer_archive(target, saved=footer_reload)
+                    tree = bound["archive_tree_sha256"]
+                    report["sidecar_footer_before"] = bound
+                else:
+                    tree = verify_fixture(target, sidecar_expected)
                 report["sidecar_fixture"] = {
                     "name": NAME,
                     "length": len(sidecar_expected),
                     "sha256": hashlib.sha256(sidecar_expected).hexdigest(),
-                    "archive_tree_before_boot": verify_fixture(target, sidecar_expected),
-                    "host_seeded": not (sidecar_reload or before_pair),
+                    "archive_tree_before_boot": tree,
+                    "host_seeded": not (sidecar_reload or before_pair or footer_reload),
                     "native_save_tested": False,
                     "persistent_ap_ledger_implemented": False,
                 }
@@ -591,6 +608,8 @@ def main() -> int:
                 report["scope"] = "Experimental native sidecar registration and load; no SAVE or delivery"
             if sidecar_save:
                 report["scope"] = "Experimental native sidecar SAVE after main; no item or AP delivery"
+            if footer_save or footer_reload:
+                report["scope"] += "; experimental native footer comparison only"
             if interrupt:
                 report["scope"] = "Inter-file failpoint on fresh copy; SIGKILL only after native main writer returns"
         wrapper = bundle / "probe.lua"
@@ -665,7 +684,7 @@ def main() -> int:
             # Observation starts in the source-verified overworld, before any bag/menu work changes.
             observation_menu = "2:X,60:-,2:A,120:-,2:Right,60:-,"
             post_steps = parse_steps((observation_menu if args.observe_native_save or sidecar_save else "") + NATIVE_SAVE_STEPS)
-            if interrupt:
+            if interrupt or footer_save:
                 # Wait for the Yes/No prompt to finish rendering; hold confirm
                 # across several native input samples, no second SAVE request.
                 post_steps = parse_steps(observation_menu + "2:B,300:-,2:Down,20:-,6:A,300:-,12:A,900:-")
@@ -727,9 +746,10 @@ def main() -> int:
                     )
                 if sidecar_save:
                     from oras_sidecar_probe import verify_fixture
-                    if verify_fixture(save_destination(runtime, identity["program_id"]), sidecar_expected) != (
-                        report["sidecar_fixture"]["archive_tree_before_boot"]
-                    ):
+                    target = save_destination(runtime, identity["program_id"])
+                    tree = (inspect_footer_archive(target, saved=False)[1]["archive_tree_sha256"]
+                            if footer_save else verify_fixture(target, sidecar_expected))
+                    if tree != report["sidecar_fixture"]["archive_tree_before_boot"]:
                         raise ValueError("Sidecar archive changed before the SAVE signal")
                 if interrupt:
                     asyncio.run(asyncio.wait_for(run_interrupt_probe(
@@ -787,8 +807,18 @@ def main() -> int:
                     raise ValueError("Save file changed during read-only probe")
             if sidecar_expected is not None:
                 from oras_sidecar_probe import after_save_payload, verify_fixture
-                tree = verify_fixture(target, after_save_payload(sidecar_expected) if sidecar_save and not interrupt
-                                      else sidecar_expected)
+                if footer_save or footer_reload:
+                    _, bound = inspect_footer_archive(target)
+                    tree = bound["archive_tree_sha256"]
+                    if footer_save and (
+                        bound["payload_sha256"] != report["sidecar_save"]["payload_sha256"]
+                        or bound["footer_sha256"] == report["sidecar_footer_before"]["footer_sha256"]
+                    ):
+                        raise ValueError("Saved sidecar differs from RAM or main's footer did not advance")
+                    report["sidecar_footer_after"] = bound
+                else:
+                    tree = verify_fixture(target, after_save_payload(sidecar_expected) if sidecar_save and not interrupt
+                                          else sidecar_expected)
                 if not sidecar_save and tree != report["sidecar_fixture"]["archive_tree_before_boot"]:
                     raise ValueError("Experimental sidecar archive changed during boot")
                 report["sidecar_fixture"]["archive_unchanged_after_boot"] = not sidecar_save
