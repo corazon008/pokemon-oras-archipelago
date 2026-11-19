@@ -13,6 +13,7 @@ import re
 import tempfile
 
 from oras_save import validate_save
+from oras_archive import capture_stable_archive, safe_archive_path, tree_digest
 from run_bizhawk_probe import PROJECT_ROOT
 
 
@@ -50,30 +51,55 @@ def sync_directory(path: Path) -> None:
 
 
 def require_single_file_archive(source: Path) -> None:
-    """Current snapshot/import schema cannot preserve additional native/AP files."""
+    """Legacy/unmanifested imports remain restricted to a single save file."""
     if source.is_symlink() or source.parent.is_symlink():
         raise ValueError("Single-file archive cannot contain symlinked save data")
     if {entry.name for entry in source.parent.iterdir()} != {source.name}:
         raise ValueError("Unsupported multi-file archive; refusing to omit additional save/AP data")
 
 
-def validate_snapshot(path: Path, rom_hash: str | None = None) -> dict:
+def write_archive(directory, files, tree):
+    directory.mkdir(mode=0o700, exist_ok=False)
+    for name in sorted(tree["directories"], key=lambda p: (p.count("/"), p)):
+        (directory / safe_archive_path(name)).mkdir(mode=0o700)
+    for name, data in sorted(files.items()):
+        write_synced(directory / safe_archive_path(name), data)
+    for name in sorted(tree["directories"], key=lambda p: (-p.count("/"), p)):
+        sync_directory(directory / name)
+    sync_directory(directory)
+
+
+def validate_snapshot(path: Path, rom_hash: str | None = None, *, allow_unpublished=False) -> dict:
+    if path.name.startswith(".partial-") and not allow_unpublished:
+        raise ValueError("Unpublished partial snapshot is not recoverable")
+    if (path.is_symlink() or (path / "snapshot.json").is_symlink()
+            or (path / "snapshot.json").stat().st_size > 1024 * 1024):
+        raise ValueError("Invalid snapshot manifest path/size")
     manifest = json.loads((path / "snapshot.json").read_text())
-    if manifest.get("kind") != "oras_save_snapshot":
+    if not isinstance(manifest, dict) or manifest.get("kind") != "oras_save_snapshot":
         raise ValueError("Not an ORAS save snapshot")
     if (manifest.get("program_id") not in ("000400000011C400", "000400000011C500")
+            or not isinstance(manifest.get("rom_sha256"), str)
             or not re.fullmatch(r"[0-9a-f]{64}", manifest.get("rom_sha256", ""))):
         raise ValueError("Invalid snapshot identity")
     if rom_hash is not None and manifest["rom_sha256"] != rom_hash:
         raise ValueError("Snapshot/ROM identity mismatch")
+    version = manifest.get("schema_version")
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError("Unsupported snapshot schema version")
     source = path / "00000001/main"
-    require_single_file_archive(source)
-    data = source.read_bytes()
-    metadata = (path / "00000001.metadata").read_bytes()
+    if version == 1:
+        require_single_file_archive(source)
+    files, metadata, tree = capture_stable_archive(source)
+    data = files["main"]
     validate_save(data)
     if (len(metadata) != 16 or digest(data) != manifest["save_sha256"]
             or digest(metadata) != manifest["metadata_sha256"]):
         raise ValueError("Snapshot integrity mismatch")
+    if version == 2 and (manifest.get("archive_tree") != tree
+                         or tree_digest(manifest.get("archive_tree")) != tree_digest(tree)
+                         or manifest.get("archive_tree_sha256") != tree_digest(tree)):
+        raise ValueError("Snapshot archive inventory/integrity mismatch")
     return manifest
 
 
@@ -84,31 +110,27 @@ def snapshot_save(source: Path, program_id: str, rom_hash: str, label: str,
         raise ValueError("Unsupported snapshot Program ID")
     if not re.fullmatch(r"[0-9a-f]{64}", rom_hash) or not re.fullmatch(r"[a-z0-9-]+", label):
         raise ValueError("Invalid snapshot identity or label")
-    require_single_file_archive(source)
+    files, metadata, tree = capture_stable_archive(source)
     source = source.resolve()
-    metadata_source = source.parent.with_suffix(".metadata")
-    data, metadata = source.read_bytes(), metadata_source.read_bytes()
+    data = files["main"]
     validate_save(data)
-    if len(metadata) != 16:
-        raise ValueError("Snapshot requires 16-byte Encore archive metadata")
-    if source.read_bytes() != data or metadata_source.read_bytes() != metadata:
-        raise ValueError("Source changed while reading snapshot")
-    require_single_file_archive(source)
+    if backup_root.resolve().is_relative_to(source.parent):
+        raise ValueError("Snapshot destination must be outside source archive")
     backup_root.mkdir(parents=True, exist_ok=True, mode=0o700)
     staging = Path(tempfile.mkdtemp(prefix=f".partial-{label}-", dir=backup_root))
     archive = staging / "00000001"
-    archive.mkdir(mode=0o700)
-    write_synced(archive / "main", data)
+    write_archive(archive, files, tree)
     write_synced(staging / "00000001.metadata", metadata)
     manifest = {
-        "kind": "oras_save_snapshot", "schema_version": 1,
+        "kind": "oras_save_snapshot", "schema_version": 2,
         "created_at": datetime.now(timezone.utc).isoformat(), "label": label,
         "program_id": program_id, "rom_sha256": rom_hash,
         "source": str(source), "save_sha256": digest(data),
         "metadata_sha256": digest(metadata), "validated_crc_blocks": 58,
+        "archive_tree": tree, "archive_tree_sha256": tree_digest(tree),
     }
     write_synced(staging / "snapshot.json", (json.dumps(manifest, indent=2) + "\n").encode())
-    validate_snapshot(staging, rom_hash)
+    validate_snapshot(staging, rom_hash, allow_unpublished=True)
     sync_directory(archive)
     sync_directory(staging)
     final = backup_root / staging.name.removeprefix(".partial-")

@@ -73,6 +73,9 @@ Avancées du 18 novembre :
 - Appels natifs constructeur/register observés : capacité un, compteur `0 → 1`,
   record `main` conforme. Snapshots/imports refusent désormais d'omettre un sidecar
   supplémentaire ; aucune allocation persistante AP ni migration d'archive réalisée.
+- Snapshots v2 d'archive complète et imports vérifiés : trois fichiers/deux dossiers
+  conservés après cold boot ; sidecar altéré refusé avant lancement. Fixtures
+  inertes uniquement, toujours aucun ledger AP enregistré par le jeu.
 
 ## Documents
 
@@ -103,6 +106,7 @@ Avancées du 18 novembre :
 - [Forks de récupération et reset/load — rapport 022](docs/reports/022-recovery-forks-and-load-reset.md).
 - [Bootstrap natif et RAM ajoutée — rapport 023](docs/reports/023-native-bootstrap-and-owned-ram.md).
 - [Trace native de l'enregistrement des fichiers — rapport 024](docs/reports/024-native-save-registration-trace.md).
+- [Snapshots/imports d'archive complète — rapport 025](docs/reports/025-full-archive-snapshots-and-imports.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

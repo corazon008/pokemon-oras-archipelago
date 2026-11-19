@@ -16,7 +16,8 @@ maintenant le chemin persistant affiché au lancement.
 
 Les deux lanceurs publient automatiquement des copies CRC-validées avant le
 lancement et après fermeture sous `local/oras/backups/`. Chaque copie contient
-`00000001/main`, les métadonnées Encore et `snapshot.json`. Les `.partial-*`
+`00000001/` complet, les métadonnées Encore et `snapshot.json` (v2 : inventaire
+de tous les fichiers/répertoires ; v1 mono-fichier reste compatible). Les `.partial-*`
 ne sont pas des backups publiés. En cas d'échec de backup, ne pas poursuivre
 les expériences avant d'avoir conservé le dernier fichier valide.
 
@@ -349,11 +350,16 @@ captures privées sous `registration-trace/connection-*`. Il ne crée pas de
 second record ni de fichier AP. Voir le
 [rapport 024](../docs/reports/024-native-save-registration-trace.md).
 
-**Limite des backups/imports actuels : archive mono-fichier uniquement.**
-Tout autre fichier ou sous-répertoire à côté de `main` provoque un refus, pas
-une copie tronquée ni une suppression. Un futur ledger séparé nécessitera un
-schéma de snapshot complet. Le formatage natif Encore supprime le répertoire
-de sauvegarde : ne pas l'utiliser comme migration en place.
+**Snapshots v2 : archive complète.** Tous les fichiers, dossiers vides et
+métadonnées sont conservés et hashés. Liens/fichiers spéciaux, chemins dangereux,
+limites dépassées ou contenu altéré : refus. Les imports multi-fichiers exigent
+un snapshot v2 vérifié et un nouveau fork `--recover-from-snapshot` en lecture
+seule. Un seed brut/v1 reste mono-fichier ; aucune restauration en place.
+Voir le [rapport 025](../docs/reports/025-full-archive-snapshots-and-imports.md).
+
+Préserver les octets d'un sidecar ne valide ni son index AP ni sa cohérence avec
+`main`. Le formatage natif Encore supprime le répertoire de sauvegarde : ne pas
+l'utiliser comme migration en place.
 
 ## Identité ROM et preuve de lecture
 

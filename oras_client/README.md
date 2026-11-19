@@ -77,6 +77,8 @@ The [research recovery fork](../docs/reports/022-recovery-forks-and-load-reset.m
 boots a verified older snapshot in a new profile only. It does not establish AP
 world binding, infer a delivery index, reset this journal or authorize replay.
 Restoring a CRC-valid file is not reconciliation of delivered items.
+Full-archive v2 snapshots also preserve opaque sidecars and empty directories;
+their hashes establish byte integrity, not AP identity or item/index coherence.
 
 Without a verified game-side counter, `next_delivery_index` must be `None`.
 The coordinator then refuses to submit anything. Potion quantity cannot stand

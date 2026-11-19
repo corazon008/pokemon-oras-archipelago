@@ -13,7 +13,11 @@ import tempfile
 from rom_identity import inspect_rom, sha256_file
 from oras_save import validate_save, inventory_bytes, inventory_entries, compare_medicine_change
 from oras_events import event_bytes, compare_events, EVENT_LENGTH
-from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path, require_single_file_archive
+from oras_profiles import (
+    PROFILE_ROOT, backup_existing_save, validate_profile_path, require_single_file_archive,
+    validate_snapshot, write_archive, write_synced, sync_directory, digest,
+)
+from oras_archive import capture_stable_archive, source_archive_unchanged, tree_digest
 from run_bizhawk_probe import (
     PROJECT_ROOT, emulator_environment, isolate_config, prepare_runtime, sha256,
 )
@@ -50,6 +54,9 @@ def save_destination(runtime: Path, program_id: str) -> Path:
 
 
 def seed_save(source: Path, destination: Path) -> None:
+    if destination.exists() or destination.is_symlink():
+        raise FileExistsError("Save copy never replaces an existing path")
+    require_single_file_archive(source)
     validate_save_container(source)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with source.open("rb") as original, destination.open("xb") as copied:
@@ -65,24 +72,50 @@ def validate_save_container(source: Path) -> None:
     validate_save(source.read_bytes())
 
 
-def seed_archive(source: Path, destination: Path) -> dict:
-    """Copy only a validated main and its required Encore archive metadata."""
-    require_single_file_archive(source)
+def seed_archive(source: Path, destination: Path, program_id=None, rom_hash=None) -> dict:
+    """Copy a complete verified snapshot, or a legacy unmanifested single-file seed."""
+    snapshot = source.parent.parent
+    verified = None
+    if (snapshot / "snapshot.json").exists():
+        verified = validate_snapshot(snapshot, rom_hash)
+        if program_id is not None and verified["program_id"] != program_id:
+            raise ValueError("Seed snapshot/ROM program ID mismatch")
+    else:
+        require_single_file_archive(source)
+    if not source.parent.with_suffix(".metadata").exists():
+        raise ValueError("Seed import requires its 16-byte Encore 00000001.metadata sibling")
+    files, metadata, tree = capture_stable_archive(source)
+    if len(files) > 1 or tree["directories"]:
+        if not verified or verified["schema_version"] != 2 or program_id is None or rom_hash is None:
+            raise ValueError("Multi-file import requires a v2 snapshot and explicit ROM/title identity")
+    validate_save(files["main"])
+    if verified and (
+        digest(files["main"]) != verified["save_sha256"]
+        or digest(metadata) != verified["metadata_sha256"]
+        or verified["schema_version"] == 2 and tree != verified["archive_tree"]
+    ):
+        raise ValueError("Seed snapshot changed before import")
     source = source.resolve()
     metadata_source = source.parent.with_suffix(".metadata")
-    if not metadata_source.is_file() or metadata_source.stat().st_size != 16:
-        raise ValueError("Seed import requires its 16-byte Encore 00000001.metadata sibling")
-    source_hash, metadata_hash = sha256(source), sha256(metadata_source)
-    seed_save(source, destination)
     metadata_target = destination.parent.with_suffix(".metadata")
-    with metadata_source.open("rb") as original, metadata_target.open("xb") as copied:
-        shutil.copyfileobj(original, copied)
-    if sha256(destination) != source_hash or sha256(metadata_target) != metadata_hash:
+    if destination.name != "main" or destination.parent.exists() or metadata_target.exists() or metadata_target.is_symlink():
+        raise FileExistsError("Archive import never replaces an existing archive or metadata")
+    if destination.parent.resolve().is_relative_to(source.parent):
+        raise ValueError("Archive import destination must be outside source archive")
+    destination.parent.parent.mkdir(parents=True, exist_ok=True)
+    write_archive(destination.parent, files, tree)
+    write_synced(metadata_target, metadata)
+    sync_directory(destination.parent.parent)
+    copied_files, copied_metadata, copied_tree = capture_stable_archive(destination)
+    if copied_files != files or copied_metadata != metadata or copied_tree != tree:
         raise ValueError("Archive copy does not match the source")
     return {
-        "seed_source": str(source), "seed_sha256": source_hash,
+        "seed_source": str(source), "seed_sha256": digest(files["main"]),
         "archive_metadata_source": str(metadata_source),
-        "archive_metadata_sha256": metadata_hash,
+        "archive_metadata_sha256": digest(metadata),
+        "archive_tree_sha256": tree_digest(tree), "archive_tree": tree,
+        "archive_file_count": len(files), "archive_directory_count": len(tree["directories"]),
+        "snapshot_schema_version": verified["schema_version"] if verified else None,
     }
 
 
@@ -198,9 +231,12 @@ def main() -> int:
         manifest = json.loads((session / "profile.json").read_text())
         if manifest.get("kind") != "oras_native_save_probe" or manifest.get("rom_sha256") != rom_hash:
             parser.error("Profile/ROM identity mismatch")
+        if manifest.get("archive_file_count", 1) > 1 or manifest.get("archive_directory_count", 0):
+            parser.error("Multi-file archives require a read-only connector recovery fork")
         runtime = session / "runtime"
         if not runtime.resolve().is_relative_to(session) or runtime.is_symlink():
             parser.error("Runtime must stay inside the private session")
+        require_single_file_archive(save_destination(runtime, identity["program_id"]))
         config_path = runtime / "config.ini"
         config = isolate_config(json.loads(config_path.read_text()), runtime)
         config_path.write_text(json.dumps(config, indent=2) + "\n")
@@ -218,7 +254,11 @@ def main() -> int:
             "archive_metadata_sha256": None,
         }
         if args.seed_save:
-            manifest.update(seed_archive(args.seed_save, save_destination(runtime, identity["program_id"])))
+            manifest.update(seed_archive(
+                args.seed_save, save_destination(runtime, identity["program_id"]), identity["program_id"], rom_hash,
+            ))
+            if manifest["archive_file_count"] > 1 or manifest["archive_directory_count"]:
+                parser.error("Multi-file archives require a read-only connector recovery fork")
         (session / "profile.json").write_text(json.dumps(manifest, indent=2) + "\n")
     if args.keyboard_only:
         config_path = runtime / "config.ini"
@@ -344,6 +384,11 @@ def main() -> int:
         return 1
     if manifest["seed_source"]:
         report["seed_source_unchanged"] = sha256(Path(manifest["seed_source"])) == manifest["seed_sha256"]
+    if manifest.get("archive_tree_sha256"):
+        try:
+            report["full_archive_source_unchanged"] = source_archive_unchanged(manifest)
+        except (OSError, ValueError):
+            report["full_archive_source_unchanged"] = False
     if manifest.get("archive_metadata_source"):
         report["archive_metadata_source_unchanged"] = (
             sha256(Path(manifest["archive_metadata_source"])) == manifest["archive_metadata_sha256"]
@@ -433,6 +478,7 @@ def main() -> int:
         report["complete"]
         and report.get("seed_source_unchanged", True)
         and report.get("archive_metadata_source_unchanged", True)
+        and report.get("full_archive_source_unchanged", True)
     ) else 1
 
 

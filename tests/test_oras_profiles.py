@@ -54,7 +54,7 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(validate_snapshot(first, ROM)["save_sha256"],
                              validate_snapshot(second, ROM)["save_sha256"])
 
-    def test_extra_archive_files_or_directories_cannot_be_silently_omitted(self):
+    def test_extra_archive_entries_preserved_but_raw_import_still_refused(self):
         for kind in ("file", "directory"):
             with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
                 root = Path(directory)
@@ -65,13 +65,13 @@ class ProfileTests(unittest.TestCase):
                 else:
                     extra.mkdir()
                 before = source.read_bytes()
-                with self.assertRaisesRegex(ValueError, "multi-file archive"):
-                    snapshot_save(source, TITLE, ROM, "test", root / "backups")
+                snapshot = snapshot_save(source, TITLE, ROM, "test", root / "backups")
+                self.assertTrue((snapshot / "00000001/ap-ledger").exists())
                 target = root / "target/00000001/main"
                 with self.assertRaisesRegex(ValueError, "multi-file archive"):
                     runner.seed_archive(source, target)
                 self.assertFalse(target.parent.exists())
-                self.assertFalse((root / "backups").exists())
+                self.assertEqual(validate_snapshot(snapshot, ROM)["schema_version"], 2)
                 self.assertEqual(source.read_bytes(), before)
                 self.assertTrue(extra.exists())
 
@@ -81,7 +81,7 @@ class ProfileTests(unittest.TestCase):
             source = make_save(root / "source")
             snapshot = snapshot_save(source, TITLE, ROM, "test", root / "backups")
             (snapshot / "00000001/ap-ledger").write_bytes(b"unmanifested")
-            with self.assertRaisesRegex(ValueError, "multi-file archive"):
+            with self.assertRaisesRegex(ValueError, "inventory/integrity"):
                 validate_snapshot(snapshot, ROM)
 
     def test_invalid_save_does_not_publish_backup(self):
@@ -135,18 +135,11 @@ class ProfileTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
             root = Path(directory)
             source = make_save(root / "source")
-            original_read = Path.read_bytes
-            reads = 0
-
-            def read(path):
-                nonlocal reads
-                if path == source:
-                    reads += 1
-                    if reads == 2:
-                        return synthetic_save(fill=2)
-                return original_read(path)
-
-            with patch.object(Path, "read_bytes", read):
+            from oras_archive import capture_archive, tree_manifest
+            first = capture_archive(source.parent)
+            changed = {"main": synthetic_save(fill=2)}
+            second = (changed, tree_manifest(changed, []))
+            with patch("oras_archive.capture_archive", side_effect=[first, second]):
                 with self.assertRaisesRegex(ValueError, "Source changed"):
                     snapshot_save(source, TITLE, ROM, "test", root / "backups")
             self.assertFalse((root / "backups").exists())

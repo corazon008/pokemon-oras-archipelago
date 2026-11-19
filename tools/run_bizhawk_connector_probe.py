@@ -29,7 +29,10 @@ from oras_connector_inventory import (
 from oras_save import inspect_save, inventory_bytes
 from oras_events import event_bytes
 from oras_connector_events import BOOT_GAMEPLAY_STEPS, EventReference, load_event_reference, read_events
-from oras_profiles import PROFILE_ROOT, backup_existing_save, validate_profile_path, validate_snapshot
+from oras_profiles import (
+    PROFILE_ROOT, backup_existing_save, validate_profile_path, validate_snapshot, require_single_file_archive,
+)
+from oras_archive import capture_stable_archive, source_archive_unchanged, tree_digest
 
 
 REQUESTS = (
@@ -249,6 +252,8 @@ def reuse_profile(path: Path, rom_hash: str) -> tuple[Path, dict]:
         raise ValueError("Profile/ROM identity mismatch")
     if manifest.get("experimental_bootstrap"):
         raise ValueError("Bootstrap profiles require a fresh explicit experiment, not normal profile reuse")
+    if manifest.get("archive_file_count", 1) > 1 or manifest.get("archive_directory_count", 0):
+        raise ValueError("Multi-file archives require a fresh read-only recovery fork")
     runtime = path / "runtime"
     if runtime.is_symlink() or not runtime.resolve().is_relative_to(path):
         raise ValueError("Runtime must stay inside the test profile")
@@ -280,6 +285,8 @@ def recovery_snapshot_reference(snapshot: Path, identity: dict) -> dict:
         "source_snapshot": str(snapshot.resolve()),
         "source_save_sha256": manifest["save_sha256"],
         "source_metadata_sha256": manifest["metadata_sha256"],
+        "snapshot_schema_version": manifest["schema_version"],
+        "source_archive_tree_sha256": manifest.get("archive_tree_sha256"),
         "restore_in_place": False, "ap_binding_proven": False,
         "next_delivery_index": None, "live_delivery_authorized": False,
         "journal_reset_or_replay_authorized": False,
@@ -440,12 +447,19 @@ def main() -> int:
             report["emulated_use_real_time"] = False
         if has_profile:
             profile_save = args.seed_save or save_destination(runtime, identity["program_id"])
+            if args.session:
+                require_single_file_archive(profile_save)
             inventory_reference = load_inventory_reference(
                 identity["rom_sha256"], identity["program_id"], profile_save,
             )
             if args.seed_save:
-                archive = seed_archive(args.seed_save, save_destination(runtime, identity["program_id"]))
+                archive = seed_archive(
+                    args.seed_save, save_destination(runtime, identity["program_id"]),
+                    identity["program_id"], identity["rom_sha256"],
+                )
                 report["archive"] = archive
+                if (archive["archive_file_count"] > 1 or archive["archive_directory_count"]) and not args.recover_from_snapshot:
+                    raise ValueError("Multi-file archive boot requires an explicit read-only recovery fork")
             report["save_sha256_before_launch"] = sha256(save_destination(runtime, identity["program_id"]))
             report["backup_before_launch"] = backup_existing_save(
                 save_destination(runtime, identity["program_id"]),
@@ -653,6 +667,14 @@ def main() -> int:
             report["scope"] = "Read-only recovery fork; verified snapshot, cold boot and AP reconnect; no delivery replay"
             report["recovery_fork"]["target_profile"] = str(session)
             report["recovery_fork"]["copy_matches_snapshot_after_boot"] = report["save_unchanged"]
+            _, current_metadata, current_tree = capture_stable_archive(save_destination(runtime, identity["program_id"]))
+            unchanged = (
+                tree_digest(current_tree) == archive["archive_tree_sha256"]
+                and hashlib.sha256(current_metadata).hexdigest() == archive["archive_metadata_sha256"]
+            )
+            report["recovery_fork"]["full_archive_matches_snapshot_after_boot"] = unchanged
+            if not unchanged:
+                raise ValueError("Recovery fork archive changed during read-only boot")
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"
@@ -672,6 +694,13 @@ def main() -> int:
                 except (OSError, ValueError) as error:
                     report.update({"status": "failed", "backup_error": str(error)})
         if archive is not None:
+            if archive.get("archive_tree_sha256"):
+                try:
+                    report["full_archive_source_unchanged"] = source_archive_unchanged(archive)
+                except (OSError, ValueError):
+                    report["full_archive_source_unchanged"] = False
+                if not report["full_archive_source_unchanged"]:
+                    report.update({"status": "failed", "error": "Full source archive changed during experiment"})
             for prefix in ("seed", "archive_metadata"):
                 if not archive.get(f"{prefix}_source"):
                     continue

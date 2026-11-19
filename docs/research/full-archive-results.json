@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "recorded_on": "2026-11-19",
+  "rom_sha256": "d76faafacd746fdcc5ec04a60b8b82ceb9678c3ad937b374234a506c50c417e4",
+  "program_id": "000400000011C400",
+  "snapshot_schema_version": 2,
+  "legacy_v1_supported": true,
+  "published_snapshots_reverified": {"v1": 49, "v2": 3},
+  "private_fixture": "local/oras/profiles/oras-archive-vy9ne9xi",
+  "snapshot": "local/oras/backups/full-archive-20ee5ihs",
+  "archive_tree_sha256": "c7531464625eef9bae99f1912a6dbecb8b4b8b517afcce489a16f9e9d4985027",
+  "archive_files": [
+    {
+      "path": "main",
+      "size": 483328,
+      "sha256": "f7906a7ec9f61e3f9ce8e13510d35269b3b0cb99ff1fe909c6de066fa68e1887"
+    },
+    {
+      "path": "proof/transport.bin",
+      "size": 50,
+      "sha256": "9a9169952870add3960555c39595ff2f2dd11d3f239da543e2aef5601bfc7e55"
+    },
+    {
+      "path": "sidecar.bin",
+      "size": 31,
+      "sha256": "794285913658c5fa10f821e610dd69726f2415e2b6b7748e99c7f76ea784ec38"
+    }
+  ],
+  "archive_directories": ["empty", "proof"],
+  "metadata_sha256": "24bb7e7f2835b4a0306d8ef31cb0ff1a37776ee7e8a591efe71e1046c78c4499",
+  "positive_control": {
+    "profile": "local/oras/profiles/oras-recovery-6kaxvr6c",
+    "status": "complete",
+    "emulated_initial_time": "2026-11-18T18:36:36",
+    "connections": 2,
+    "submitted_reads_including_skipped": 10,
+    "guards": 4,
+    "skipped_reads": 2,
+    "lua_preflight_reads": 479,
+    "memory_writes": 0,
+    "exit_code": 0,
+    "full_archive_source_unchanged": true,
+    "full_archive_matches_snapshot_after_boot": true,
+    "before_backup": "local/oras/backups/before-connector-pfeoo99u",
+    "after_backup": "local/oras/backups/after-connector-82n2p2mj",
+    "next_delivery_index": null,
+    "journal_reset_or_replay_authorized": false
+  },
+  "negative_control": {
+    "corrupted_copy": "local/oras/profiles/oras-archive-vy9ne9xi/corrupt-control-not-a-backup",
+    "profile": "local/oras/profiles/oras-recovery-a322jk1x",
+    "status": "failed",
+    "error": "ValueError: Snapshot archive inventory/integrity mismatch",
+    "emulator_launched": false,
+    "memory_reads": 0,
+    "memory_writes": 0,
+    "expected_rejection_verified": true,
+    "published_source_snapshot_unchanged": true
+  },
+  "native_save_actions": 0,
+  "archive_format_actions": 0,
+  "additional_files_are_transport_fixtures_only": true,
+  "second_record_registered": false,
+  "native_ap_persistence_verified": false,
+  "atomic_cross_file_game_transaction_proven": false,
+  "restore_in_place": false,
+  "live_delivery_enabled": false,
+  "unit_tests_passed": 231
+}
