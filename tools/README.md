@@ -247,6 +247,42 @@ appels indirects, branches vers les boucles et reconstruction du layout aligné.
 Ni SAVE, ni méthode native, ni callback d'exécution n'est déclenché par ces
 outils. Voir le [rapport 020](../docs/reports/020-save-records-and-serialization.md).
 
+### Observer une sauvegarde native sur copie
+
+```sh
+python3 tools/run_bizhawk_connector_probe.py \
+  --rom "ROMs/Pokemon Omega Ruby (USA) (En,Ja,Fr,De,Es,It,Ko) (Rev 2).3ds" \
+  --seed-save local/oras/backups/after-connector-oo15gvip/00000001/main \
+  --observe-native-save --initial-time 2026-11-18T18:36:36 \
+  --speed 400 --timeout 300
+```
+
+Cet exemple reproduit **ce checkpoint précis** et son contexte de temps.
+`--observe-native-save` exige une copie fraîche, interdit `--session` et
+l'expérience Potion, et garde les contrôles complets avant signal des boutons.
+La macro entre dans le sac depuis l'overworld validé, puis confirme SAVE.
+Aucune écriture mémoire n'est envoyée.
+
+`--initial-time` est optionnel et réservé aux copies `--seed-save` :
+il fixe l'horloge **émulée** dans leur configuration seulement, entre 2000 et
+2099, sans timezone. Ne pas appliquer arbitrairement cette date à un autre save.
+Le contrôle du rapport 021 l'utilise parce que la comparaison stricte d'une
+queue EventWork inconnue diverge au changement de contexte temporel ; aucun
+octet n'est masqué. L'horloge hôte et le réglage RTC du profil original ne sont pas changés.
+
+Après les contrôles AP, sept plages RAM et le fichier backing sont lus à chaque
+frame, au maximum 4 000 ticks. Les versions de buffers, `timeline.tsv`,
+`reads.tsv` et la configuration sont conservées sous `native-save/`, en privé.
+Une référence initiale incorrecte, une lecture courte ou des frames manquantes
+font échouer la validation. Le polling peut perturber les timings.
+
+**Les `file-*.bin` observés peuvent être CRC-invalides : ce ne sont pas des
+backups.** Utiliser seulement les snapshots CRC-validés de `local/oras/backups/`.
+Le résultat final exige fichier changé, 58 CRC valides, concordance des plages
+RAM échantillonnées/footer et contrôles de progression inchangés. Cela ne prouve
+pas une transaction item/index ni une sauvegarde résistante aux crashs.
+Voir le [rapport 021](../docs/reports/021-native-save-observation.md).
+
 ## Identité ROM et preuve de lecture
 
 ```sh

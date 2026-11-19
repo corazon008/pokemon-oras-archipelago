@@ -69,6 +69,15 @@ async def read_events(api, context, reference: EventReference, audit: dict) -> d
     audit["memory_read_requests"] += 1
     payloads = await api.read(context, [(reference.address, EVENT_LENGTH, "System Bus")])
     if len(payloads) != 1 or payloads[0] != reference.expected:
+        if len(payloads) == 1 and len(payloads[0]) == EVENT_LENGTH:
+            changed = [i for i, (old, new) in enumerate(zip(reference.expected, payloads[0])) if old != new]
+            audit["event_read_mismatch"] = {
+                "actual_sha256": hashlib.sha256(payloads[0]).hexdigest(),
+                "reference_sha256": hashlib.sha256(reference.expected).hexdigest(),
+                "differing_byte_count": len(changed), "first_differing_offsets": changed[:256],
+            }
+            if audit.get("event_mismatch_capture"):
+                Path(audit["event_mismatch_capture"]).write_bytes(payloads[0])
         raise ValueError("Runtime events do not match the CRC-validated full EventWork reference")
     return {
         "domain": "System Bus", "address": f"0x{reference.address:08X}", "length": EVENT_LENGTH,

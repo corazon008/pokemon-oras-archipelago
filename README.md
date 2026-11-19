@@ -61,6 +61,9 @@ Avancées du 18 novembre :
 - Record `data:/main` relié au manager, candidats BackupFile/BackupSystem et
   boucles de transfert repérés ; layout complet reproduit statiquement.
   Aucun SAVE déclenché dans cette phase, aucune atomicité démontrée.
+- 19 novembre : SAVE natif instrumenté sur copie, 1 357 frames, rechargement
+  à froid réussi. Un état backing CRC-invalide est observé avant le fichier final.
+  Source préservée ; horloge contrôlée explicitement sur copie, pas de byte masqué.
 
 ## Documents
 
@@ -87,6 +90,7 @@ Avancées du 18 novembre :
 - [Exécutable et objets de sauvegarde — rapport 018](docs/reports/018-executable-and-save-objects.md).
 - [Manager natif de sauvegarde — rapport 019](docs/reports/019-native-save-manager.md).
 - [Records de fichier et sérialisation — rapport 020](docs/reports/020-save-records-and-serialization.md).
+- [Sauvegarde native instrumentée — rapport 021](docs/reports/021-native-save-observation.md).
 - [Sonde reproductible et lancement isolé](tools/README.md).
 
 ## Prochain jalon

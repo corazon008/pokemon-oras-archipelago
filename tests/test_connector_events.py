@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 from oras_connector_events import (
     OR_ROM_SHA256, EventReference, clock_scene_observation, load_event_reference, pokedex_observation, read_events,
 )
-from oras_events import EVENT_LENGTH, FLAG_OFFSET
+from oras_events import EVENT_LENGTH, FLAG_OFFSET, TAIL_OFFSET, compare_events
 from rom_identity import CodeReference
 from run_bizhawk_connector_probe import exercise_connector, reuse_profile
 from run_bizhawk_save_probe import keyboard_only_config
@@ -98,6 +98,23 @@ class EventTransportTests(unittest.TestCase):
                 API(clock_block(5)), None, EventReference(0x08C7DAEC, clock_block(4), OR_ROM_SHA256), audit,
             ))
         self.assertEqual(audit["memory_read_requests"], 1)
+        self.assertEqual(audit["event_read_mismatch"]["first_differing_offsets"], [260])
+
+    def test_unknown_tail_mismatch_is_captured_not_masked_or_called_a_flag(self):
+        expected = clock_block(2)
+        actual = bytearray(expected)
+        actual[TAIL_OFFSET] = 1
+        with tempfile.TemporaryDirectory(dir="/tmp/opencode") as directory:
+            capture = Path(directory) / "mismatch.bin"
+            audit = {"memory_read_requests": 0, "event_mismatch_capture": str(capture)}
+            with self.assertRaisesRegex(ValueError, "do not match"):
+                asyncio.run(read_events(API(bytes(actual)), None,
+                                        EventReference(0x08C7DAEC, expected, OR_ROM_SHA256), audit))
+            self.assertEqual(capture.read_bytes(), actual)
+        changes = compare_events(expected, actual)
+        self.assertEqual(changes["flag_changes"], [])
+        self.assertEqual(changes["work_changes"], [])
+        self.assertEqual(changes["unknown_tail_changed_offsets"], ["0x490"])
 
     def test_positive_pokedex_bit_rechecked_after_reconnect_without_writes(self):
         data = bytearray(clock_block(4))

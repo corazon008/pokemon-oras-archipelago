@@ -1,10 +1,11 @@
-"""Probe upstream AP transport in fresh private profiles; optional bounded Potion experiment."""
+"""Probe pinned AP transport; explicit Potion/native-SAVE experiments use isolated copies."""
 
 from __future__ import annotations
 
 import argparse
 import asyncio
 import base64
+from datetime import datetime
 import hashlib
 import json
 import math
@@ -201,7 +202,7 @@ async def test_strict_guard(api, context, code: CodeReference, audit: dict) -> d
 
 
 async def finish_native_ui(process, signal: Path, marker: Path, timeout: float) -> None:
-    signal.touch()  # Only called after write readback and reconnection verification.
+    signal.touch()  # Only called after the selected experiment's preconditions pass.
     deadline = asyncio.get_running_loop().time() + timeout
     while asyncio.get_running_loop().time() < deadline:
         if marker.exists():
@@ -226,6 +227,35 @@ def reuse_profile(path: Path, rom_hash: str) -> tuple[Path, dict]:
     return runtime, manifest
 
 
+def apply_initial_time(config_path: Path, value: str) -> str:
+    clock = datetime.fromisoformat(value)
+    if clock.tzinfo is not None or not datetime(2000, 1, 1) <= clock < datetime(2100, 1, 1):
+        raise ValueError("Initial emulated time must be timezone-free and within 2000..2099")
+    config = json.loads(config_path.read_text())
+    matches = [settings for core, settings in config.get("CoreSyncSettings", {}).items()
+               if core.rsplit(".", 1)[-1] == "Encore"]
+    if len(matches) != 1:
+        raise ValueError("Initial-time control requires one existing Encore configuration")
+    canonical = clock.isoformat(timespec="seconds")
+    matches[0].update({"UseRealTime": False, "InitialTime": canonical})
+    config_path.write_text(json.dumps(config, indent=2) + "\n")
+    return canonical
+
+
+def inspect_initial_objects(objects, rom, report):
+    from oras_save_manager import inspect_manager_capture
+    manager = report["save_objects"]["manager"]
+    manager.update(inspect_manager_capture(
+        objects, rom, manager, (Path(report["backup_before_launch"]) / "00000001/main").read_bytes(),
+    ))
+    if (manager["size_mismatch_ids"] or manager["metadata_descriptors_matching_file_layout"] != 58
+            or not manager["metadata_payload_matches_saved_footer"]):
+        raise ValueError("Manager metadata or recognized sizes differ from the validated reference")
+    if manager.get("backrefs_requested"):
+        from oras_save_references import inspect_reference_capture
+        manager["references"] = inspect_reference_capture(objects, rom, manager["predicted_base"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bizhawk", type=Path, default=PROJECT_ROOT / "bin/BizHawk-2.11.1-linux-x64")
@@ -237,6 +267,9 @@ def main() -> int:
     parser.add_argument("--scan-save-objects", action="store_true", help="Read-only executable-derived block47 object search")
     parser.add_argument("--trace-save-manager", action="store_true", help="Read-only constructor-derived manager table and object headers")
     parser.add_argument("--scan-save-references", action="store_true", help="Read-only heap references to the verified native save manager")
+    parser.add_argument("--observe-native-save", action="store_true",
+                        help="Frame-sample one native SAVE; requires a fresh --seed-save copy, no memory writes")
+    parser.add_argument("--initial-time", help="Explicit emulated RTC time (ISO 8601); fresh seeded copies only")
     parser.add_argument("--steps", help="Native boot steps; defaults to gameplay for events, Medicine otherwise")
     parser.add_argument("--speed", type=int, default=100)
     parser.add_argument("--strict-guards", action="store_true", help="Install and read-only test a fail-closed GUARD shim")
@@ -259,6 +292,12 @@ def main() -> int:
     if args.seed_save and args.session:
         parser.error("--seed-save and --session are mutually exclusive")
     has_profile = bool(args.seed_save or args.session)
+    if args.initial_time and not args.seed_save:
+        parser.error("--initial-time requires a fresh --seed-save copy; existing profiles are not changed")
+    if args.observe_native_save:
+        if not args.seed_save or args.session or args.experimental_potion_1_to_2:
+            parser.error("--observe-native-save requires a fresh --seed-save copy and forbids Potion writes")
+        args.scan_save_references = True
     if args.scan_save_references:
         args.trace_save_manager = True
     if args.trace_save_manager:
@@ -330,6 +369,9 @@ def main() -> int:
             report["archive"] = archive
         else:
             runtime = prepare_runtime(source, session)
+        if args.initial_time:
+            report["emulated_initial_time"] = apply_initial_time(runtime / "config.ini", args.initial_time)
+            report["emulated_use_real_time"] = False
         if has_profile:
             profile_save = args.seed_save or save_destination(runtime, identity["program_id"])
             inventory_reference = load_inventory_reference(
@@ -350,6 +392,7 @@ def main() -> int:
                 potion_transition(identity["rom_sha256"], code_reference, inventory_reference)
                 report["scope"] = "Experimental guarded Potion 1-to-2, readback, reconnect and native save"
             if args.read_event_work:
+                report["event_mismatch_capture"] = str(session / "event-mismatch.bin")
                 event_reference = load_event_reference(
                     identity["rom_sha256"], identity["program_id"], profile_save,
                 )
@@ -360,7 +403,8 @@ def main() -> int:
         env = emulator_environment(runtime, automated=True)
         for optional in ("ORAS_CONNECTOR_BOOT", "ORAS_CONNECTOR_POST_SCRIPT", "ORAS_CONNECTOR_OBJECT_SCRIPT",
                          "ORAS_CONNECTOR_STRICT_GUARD_SCRIPT", "ORAS_CONNECTOR_STRICT_GUARD_READY",
-                         "ORAS_OBJECT_MANAGER_TABLE", "ORAS_OBJECT_MANAGER_REFERENCES"):
+                         "ORAS_OBJECT_MANAGER_TABLE", "ORAS_OBJECT_MANAGER_REFERENCES",
+                         "ORAS_NATIVE_SAVE_OBSERVER_SCRIPT", "ORAS_NATIVE_SAVE_OBSERVER_CONFIG"):
             env.pop(optional, None)
         env.update({
             "ORAS_CONNECTOR_DIRECTORY": str(bundle),
@@ -418,11 +462,13 @@ def main() -> int:
                     report["save_objects"]["manager"]["record_referrers_requested"] = True
                     report["save_objects"]["manager"]["references_analysis_sha256"] = sha256(
                         PROJECT_ROOT / "tools/oras_save_references.py")
-        if args.experimental_potion_1_to_2:
+        if args.experimental_potion_1_to_2 or args.observe_native_save:
             post = session / "native-save"
             post.mkdir()
             post_plan = post / "steps.txt"
-            post_steps = parse_steps(NATIVE_SAVE_STEPS)
+            # Observation starts in the source-verified overworld, before any bag/menu work changes.
+            observation_menu = "2:X,60:-,2:A,120:-,2:Right,60:-,"
+            post_steps = parse_steps((observation_menu if args.observe_native_save else "") + NATIVE_SAVE_STEPS)
             post_plan.write_text("".join(f"{frames}:{names}\n" for frames, names in post_steps))
             report["native_save_steps"] = post_steps
             env.update({
@@ -431,6 +477,14 @@ def main() -> int:
                 "ORAS_CONNECTOR_POST_CAPTURE": str(post),
                 "ORAS_CONNECTOR_POST_SIGNAL": str(session / "finish-ui"),
             })
+            if args.observe_native_save:
+                observer_script = PROJECT_ROOT / "tools/native_save_observer.lua"
+                env.update({
+                    "ORAS_NATIVE_SAVE_OBSERVER_SCRIPT": str(observer_script),
+                    "ORAS_NATIVE_SAVE_OBSERVER_CONFIG": str(post / "observer.json"),
+                })
+                report["native_observation"] = {"observer_sha256": sha256(observer_script)}
+                report["scope"] = "Native SAVE on fresh seeded copy; read-only frame and host-file sampling"
         command = [
             mono, str(runtime / "EmuHawk.exe"),
             f"--config={runtime / 'config.ini'}", f"--lua={wrapper}", str(rom),
@@ -456,7 +510,17 @@ def main() -> int:
                         timeout=args.timeout,
                     )
                 )
-                if args.experimental_potion_1_to_2:
+                if args.observe_native_save:
+                    from oras_native_save_observation import prepare_observation
+                    if report["memory_write_requests"] != 0:
+                        raise ValueError("Native observation must not submit memory writes")
+                    inspect_initial_objects(objects, rom, report)
+                    prepare_observation(
+                        post, objects, save_destination(runtime, identity["program_id"]),
+                        (Path(report["backup_before_launch"]) / "00000001/main").read_bytes(),
+                        report["save_objects"],
+                    )
+                if args.experimental_potion_1_to_2 or args.observe_native_save:
                     asyncio.run(finish_native_ui(
                         process, session / "finish-ui", post / "complete", args.timeout,
                     ))
@@ -483,33 +547,28 @@ def main() -> int:
                 raise ValueError("Saved inventory does not match expected experiment result")
             report["saved_inventory_matches_expected"] = True
             if event_reference is not None:
-                if event_bytes(target.read_bytes()) != event_reference.expected:
+                events_unchanged = event_bytes(target.read_bytes()) == event_reference.expected
+                if not events_unchanged and not args.observe_native_save:
                     raise ValueError("Saved EventWork changed during read-only probe")
-                report["saved_events_match_reference"] = True
-            if not args.experimental_potion_1_to_2:
+                report["saved_events_match_reference"] = events_unchanged
+            if not args.experimental_potion_1_to_2 and not args.observe_native_save:
                 report["save_unchanged"] = sha256(target) == report["save_sha256_before_launch"]
                 if not report["save_unchanged"]:
                     raise ValueError("Save file changed during read-only probe")
+            if args.observe_native_save:
+                from oras_native_save_observation import inspect_observation
+                report["native_observation"].update(inspect_observation(
+                    post, (Path(report["backup_before_launch"]) / "00000001/main").read_bytes(),
+                    target.read_bytes(),
+                ))
             # A hash-bound manifest permits a subsequent cold reload with the native UI tool.
             if args.seed_save:
                 (session / "profile.json").write_text(json.dumps({
                     **archive, "kind": "oras_native_save_probe", "program_id": identity["program_id"],
                     "rom_sha256": identity["rom_sha256"],
                 }, indent=2) + "\n")
-        if args.trace_save_manager:
-            from oras_save_manager import inspect_manager_capture
-            report["save_objects"]["manager"].update(inspect_manager_capture(
-                objects, rom, report["save_objects"]["manager"],
-                (Path(report["backup_before_launch"]) / "00000001/main").read_bytes(),
-            ))
-            manager = report["save_objects"]["manager"]
-            if (manager["size_mismatch_ids"]
-                    or manager["metadata_descriptors_matching_file_layout"] != 58
-                    or not manager["metadata_payload_matches_saved_footer"]):
-                raise ValueError("Manager metadata or recognized sizes differ from the validated reference")
-            if args.scan_save_references:
-                from oras_save_references import inspect_reference_capture
-                manager["references"] = inspect_reference_capture(objects, rom, manager["predicted_base"])
+        if args.trace_save_manager and not args.observe_native_save:
+            inspect_initial_objects(objects, rom, report)
         report["status"] = "complete"
     except Exception as error:
         report["status"] = "failed"

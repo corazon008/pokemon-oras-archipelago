@@ -1,5 +1,5 @@
 -- Native buttons only, driven by frame-end events while upstream connector runs.
--- Signal is created only after Python verifies the full written inventory.
+-- Signal is created only after Python verifies the experiment preconditions.
 local plan = assert(os.getenv("ORAS_CONNECTOR_POST_PLAN"))
 local capture = assert(os.getenv("ORAS_CONNECTOR_POST_CAPTURE"))
 local signal = assert(os.getenv("ORAS_CONNECTOR_POST_SIGNAL"))
@@ -28,12 +28,29 @@ for line in io.lines(plan) do
 end
 assert(#steps > 0, "Empty post UI plan")
 local index, remaining, started, done = 1, 0, false, false
+local observer
 event.onframeend(function()
     if done then return end
     if not started then
         local file = io.open(signal, "r")
         if not file then return end
         file:close()
+        local script = os.getenv("ORAS_NATIVE_SAVE_OBSERVER_SCRIPT")
+        if script then
+            assert(emu.getsystemid() == "3DS")
+            local exists = false
+            for _, name in pairs(memory.getmemorydomainlist()) do
+                if name == "System Bus" then exists = true; break end
+            end
+            assert(exists, "Native-save observer requires exact System Bus domain")
+            local size = memory.getmemorydomainsize("System Bus")
+            assert(size == 0 or size == 0x100000000, "Unexpected 3DS System Bus size")
+            local file = assert(io.open(assert(os.getenv("ORAS_NATIVE_SAVE_OBSERVER_CONFIG")), "r"))
+            local config = require("json").decode(file:read("*a")); file:close()
+            observer = dofile(script)(config, function(address, length)
+                return memory.read_bytes_as_binary_string(address, length, "System Bus")
+            end)
+        end
         started = true
     elseif remaining > 0 then
         remaining = remaining - 1
@@ -42,8 +59,10 @@ event.onframeend(function()
             index = index + 1
         end
     end
+    if observer then observer.tick(emu.framecount(), index) end
     if index > #steps then
         joypad.set(neutral)
+        if observer then observer.finish() end
         local file = assert(io.open(capture .. "/complete", "w"))
         file:write(tostring(emu.framecount()), "\n")
         file:close()

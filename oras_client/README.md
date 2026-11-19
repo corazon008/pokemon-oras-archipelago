@@ -65,6 +65,14 @@ requires it. It is still **not** a transaction across multiple WRITE requests.
 PC-side SQLite alone does not close the crash window between changing the game
 and recording an acknowledgment.
 
+Frame-level [native-save research](../docs/reports/021-native-save-observation.md)
+observed a CRC-invalid backing-file sample between valid initial/final saves.
+A UI success message or matching RAM is therefore not a durable receipt.
+No crash recovery, filesystem atomicity or nonzero AP ledger persistence has
+been established. The experimental cold reload used an explicit fixed clock
+on an isolated copy; an unknown EventWork tail byte varies with time context
+and is neither masked nor repurposed as AP storage.
+
 Without a verified game-side counter, `next_delivery_index` must be `None`.
 The coordinator then refuses to submit anything. Potion quantity cannot stand
 in for a delivery index: consumption, native gifts and rollback change quantity.
